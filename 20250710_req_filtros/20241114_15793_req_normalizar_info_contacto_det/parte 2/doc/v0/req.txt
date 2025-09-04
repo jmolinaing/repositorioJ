@@ -1,0 +1,37 @@
+1.- Por cada origen de los que aparece en el SP, obtener los datos de contacto y aplicar el mismo procedimiento de limpieza y validación de formato, la idea es obtener sólo datos válidos.
+
+2.- Si el dato ya se encuentra en la tabla CONTACTO_DET_NEW, entonces se deben actualizar las nuevas columnas:
+
+                CTD_TIPO_VAL = ‘V’ (V=Válido, N=No Válido)
+
+USU_LOGIN_VAL = ‘SYSTEM’     
+
+CTD_FECHA_VAL = <fecha del dato de origen> 
+
+CTD_ORIGEN_VAL = <origen de la validación según el SP>
+
+3.- Si el dato no se encuentra registrado, entonces se debe agregar a la tabla CONTACTO_DET_NEW con los siguientes datos:
+
+                USU_LOGIN = ‘SYSTEM’
+
+CTD_FECREG  = <fecha del dato de origen>        
+
+CTD_ORIGEN  = <origen de la validación según el SP>
+
+ 4.- Excepcionalmente para el origen CONTRATO, si el dato de contacto es distinto al que ya existe para el origen “CONTRATO” en la tabla CONTACTO_DET_NEW, entonces se debe ACTUALIZAR (reemplazar) el dato y adicionalmente ACTUALIZAR las siguientes columnas:
+
+CTD_FECREG  = <fecha actual> 
+
+CTD_ORIGEN  = “CONTRATO”
+
+CTD_TIPO_VAL = null
+
+USU_LOGIN_VAL = null
+
+CTD_FECHA_VAL = null
+
+CTD_ORIGEN_VAL = null
+
+ 
+
+Atte

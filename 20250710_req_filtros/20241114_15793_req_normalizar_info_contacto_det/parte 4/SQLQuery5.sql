@@ -1,0 +1,8 @@
+dw_datos_deudor: spu_ges_cob_datos_deudor
+
+dw_gc_contrato: spu_ges_cob_gc_contrato
+
+
+
+
+sp_helptext spu_ges_cob_datos_deudor

@@ -1,0 +1,28 @@
+el tipo de wasap pasaria a la parte de plantilla
+
+el unico filtro de sleecion unica es el tipo deuda
+
+por default debe estar habilitada la plantilla
+
+
+y el filtro de estado hay q cambiar vigentes -> habilitada
+
+
+en la ventana plantilla filtros crear abajo un boton : Descargar datos, obtener la bd los deudores que cumpan estas condiciones
+y con las columnas q se requieren el envio a bulk en la planilla excel , casillas template
+
+la primera pantilla, q traifa la info de deudores que esten afiliados y esten vigentes y cuya deuda sea menor igual a una uf.
+
+requerimiento:
+video 2 11:12
+hacer un sp, una salida que va recibir el codigo plantilla y va devolver un conjunto de deudores que cumplan las condiciones de los filtros
+y que entreguen el conjunto de los datos xls.
+
+hay logica para completar datos (va en duro en el sp)
+y logica para filtrar los datos (lo da la plantilla)
+
+video 3
+1.- tabla base.
+2.- abrá que armar deudas en 3 lotes
+
+
