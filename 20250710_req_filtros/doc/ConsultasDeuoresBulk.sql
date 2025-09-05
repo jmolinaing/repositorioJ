@@ -1,3 +1,8 @@
+
+
+
+
+
 --Deuda Cotizaciones afiliados (personas)
 select cot_rut, sum(DEC_PACTADO	- DEC_PAGADO) as deuda
 --, [dbo].[f_get_datocontacto](cot_rut,'mail') as deuda 
@@ -66,6 +71,7 @@ where afi_rut is null
 
 ---Obtener loscompromisos de pago GEC_COMPROM_MONTO	y GEC_COMPROM_FECHA
 -- tengo que ir a buscar el ultimo para e rut fecha digita
+
 select * from GESTION_COBRANZA where tgc_codigo=29
 
 --Obtener el cobrador asignado a LUR o CHP
