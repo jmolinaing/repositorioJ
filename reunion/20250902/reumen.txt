@@ -23,6 +23,11 @@ y logica para filtrar los datos (lo da la plantilla)
 
 video 3
 1.- tabla base.
-2.- abrá que armar deudas en 3 lotes
+2.- abrá que armar deudas en 3 lotes:
+deuda afiliados cotizaciones
+deudas empresas o empleadores
+Deuda LUR (Ley de Urgencia) y Cheques Protestados
+
+
 
 

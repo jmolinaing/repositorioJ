@@ -10,9 +10,9 @@
 /*
 --197130 total
 --Haciendo un union 193.588 reg
+-- total 193.588 reg en 4:37 min
 execute spu_ges_cob_Descargar_datos
 */
-
 
 
 ALTER procedure [dbo].[spu_ges_cob_Descargar_datos] 
@@ -22,8 +22,12 @@ BEGIN
 	set nocount on;
 
 	IF OBJECT_ID(N'tempdb..#tabla_final', N'U') IS NOT NULL DROP TABLE #tabla_final
+	IF OBJECT_ID(N'tempdb..#origen_cotiz_empl', N'U') IS NOT NULL DROP TABLE #origen_cotiz_empl
+	IF OBJECT_ID(N'tempdb..#origen_lur', N'U') IS NOT NULL DROP TABLE #origen_lur
+	IF OBJECT_ID(N'tempdb..#origen_chq', N'U') IS NOT NULL DROP TABLE #origen_chq
+	IF OBJECT_ID(N'tempdb..TFU', N'U') IS NOT NULL DROP TABLE #TFU
 
-	--Primera tabla traspaso: se insertaran todos los registros de los ORIGENES
+	--1.- Se crea #tabla_final: contiene el resultado salida de este sp, concentrara los rut de los origenes: COTIZANTE EMPLEADOR, ley lur y cheques.
 	create table #tabla_final
 	(
 		--origen varchar(30) not null
@@ -45,7 +49,7 @@ BEGIN
 		, deuda_chq numeric(15) null
 		, cobrador_asignado_lur_chq numeric(10) null
 		, fono_contacto varchar(30) null
-		--, primary key (rut_reudor)
+		, primary key (rut_deudor)
 	)
 
 
@@ -73,6 +77,9 @@ having sum(DEC_PACTADO	- DEC_PAGADO) > 0
 ) a
 group by rut
 
+-- Crear índice no agrupado en la tabla temporal
+CREATE NONCLUSTERED INDEX IX_origen_cotiz_empl_rut ON #origen_cotiz_empl (rut)
+
 
 --2.- ORIGEN LUR 
 --CONJUNTO LUR  (7491 rows affected)
@@ -83,6 +90,9 @@ where deu_monto > 0
 and TDE_CODIGO = 1
 group by DDR_rut
 
+-- Crear índice no agrupado en la tabla temporal
+CREATE NONCLUSTERED INDEX IX_origen_lur_rut ON #origen_lur (rut)
+
 --2.- ORIGEN CHQ 
 --CONJUNTO chq  (2029 rows affected)
 select DDR_rut RUT, sum(deu_monto) deuda_chq
@@ -92,6 +102,9 @@ where deu_monto > 0
 and TDE_CODIGO = 2
 group by DDR_rut
 
+
+-- Crear índice no agrupado en la tabla temporal
+CREATE NONCLUSTERED INDEX IX_origen_chq_rut ON #origen_chq (rut)
 
 --______________INSERT TABLA FINAL _________________________
 
@@ -116,26 +129,30 @@ group by dt.cot_rut
 	--and cot_rut = @rut
 
 
+-- Crear índice no agrupado en la tabla temporal
+CREATE NONCLUSTERED INDEX IX_TFU_rut ON #TFU (rut)
 
 
---UPDATE DEUDAS
+--UPDATE DEUDA_cotizaciones
 UPDATE #tabla_final 
 SET DEUDA_cotizaciones = #origen_cotiz_empl.DEUDA
 from #origen_cotiz_empl
 where rut_deudor = #origen_cotiz_empl.rut
 
+--UPDATE DEUDA_lur
 UPDATE #tabla_final 
 SET DEUDA_lur = #origen_lur.DEUDA_LUR
 from #origen_lur
 where rut_deudor = #origen_lur.rut
 
+--UPDATE DEUDA_chq
 UPDATE #tabla_final 
 SET DEUDA_chq = #origen_chq.DEUDA_chq
 from #origen_chq
 where rut_deudor = #origen_chq.rut
 
 --____________________
--- UPDATE nombre_deudor Y email_destinatario
+-- UPDATE nombre_deudor, email_destinatario, nombre_ejecutivo, email_ejecutivo, fono_ejecutivo, fono_contacto
 UPDATE #tabla_final
 set nombre_deudor = d.ddr_nombre
 --, email_destinatario = [dbo].[f_get_datocontacto](rut_deudor,'email') 
@@ -155,7 +172,7 @@ left join cobrador c with (nolock)
 where rut_deudor = d.ddr_rut 
 
 
-
+-- UPDATE monto_posible_compensar
 UPDATE #tabla_final
 set monto_posible_compensar = case when ( (isnull(DEUDA_cotizaciones, 0) + isnull(DEUDA_lur, 0)) >= #tfu.saldo_tfu  ) then  #tfu.saldo_tfu else (isnull(DEUDA_cotizaciones, 0) + isnull(DEUDA_lur, 0)) end
 from #tfu
@@ -165,46 +182,51 @@ where rut_deudor = #tfu.rut
 
 ---Obtener loscompromisos de pago GEC_COMPROM_MONTO	y GEC_COMPROM_FECHA
 -- tengo que ir a buscar el ultimo para e rut fecha digita
-/*
 
-select * from GESTION_COBRANZA where tgc_codigo=29
 
- datetime null
-		, 
+--select * from GESTION_COBRANZA where tgc_codigo=29
 
+
+-- UPDATE fecha_compromiso, monto_compromiso
 UPDATE #tabla_final 
-SET fecha_compromiso = #origen_chq.DEUDA_chq
-, monto_compromiso
+SET fecha_compromiso = m.GEC_COMPROM_FECHA
+, monto_compromiso = m.GEC_COMPROM_MONTO
 from 
 (
 
-select gc.ddr_rut, GEC_COMPROM_MONTO, GEC_COMPROM_FECHA
-from GESTION_COBRANZA gc with (nolock)
-join
-(
-	select ddr_rut, max(GEC_FECDIGITA) GEC_FECDIGITA
-	from GESTION_COBRANZA gc with (nolock)
-	--join #tabla_final t
-	--	on gc.DDR_RUT = t.rut_deudor
-	where tgc_codigo=29
-	group by ddr_rut
-) a
-on gc.DDR_RUT = a.DDR_RUT
-and gc.GEC_FECDIGITA = a.GEC_FECDIGITA
+		select gc.ddr_rut rut, GEC_COMPROM_MONTO, GEC_COMPROM_FECHA
+		from GESTION_COBRANZA gc with (nolock)
+		join
+		(
+			select ddr_rut, max(GEC_FECDIGITA) GEC_FECDIGITA
+			from GESTION_COBRANZA gc with (nolock)
+			--join #tabla_final t
+			--	on gc.DDR_RUT = t.rut_deudor
+			where tgc_codigo=29
+			group by ddr_rut
+		) a
+		on gc.DDR_RUT = a.DDR_RUT
+		and gc.GEC_FECDIGITA = a.GEC_FECDIGITA
+) m
+where rut_deudor = m.rut
 
 
 
 
-)
+select distinct cob_codigo, ddr_rut rut--, deu_asig_desde
+into #cob_asig
+FROM GCDF_DEUDOR_ASIGNADO DAU with (NOLOCK)
+WHERE 1 = 1 
+and (
+	(deu_asig_desde <= getdate() and (deu_asig_hasta >= getdate() or deu_asig_hasta is null))
+)  
 
 
-
-
-
-where rut_deudor = #origen_chq.rut
-*/
-
---SELECT * FROM cobrador
+--UPDATE cobrador_asignado_lur_chq
+UPDATE #tabla_final 
+SET cobrador_asignado_lur_chq = #cob_asig.COB_CODIGO
+from #cob_asig
+where rut_deudor = #cob_asig.rut
 
 
 --SELECT * FROM #origen_cotiz_empl
