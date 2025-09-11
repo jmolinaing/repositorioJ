@@ -3,8 +3,8 @@
  nombre del objeto	:	spu_ges_cob_Descargar_datos                                                                                                  
  parametros			:	@epl_codigo varchar(50) = código de plantilla.			                                                                                 
  creado por			:	jorge molina													
- fecha creación		:	12-2024                                                      
- descripción		:	muestra el valor más confiable del parametro direccion, fono, email																					
+ fecha creación		:	                                                    
+ descripción		:																		
 ========================================================================================
 */
 /*
@@ -12,7 +12,7 @@
 --Haciendo un union 193.588 reg
 -- total 193.588 reg en 4:37 min
 execute spu_ges_cob_Descargar_datos_v2
---396
+--193.588 EN 7:15 SEG
 */
 
 
@@ -63,6 +63,12 @@ BEGIN
 		, f_deuda_lur_con_credito varchar(2) null
 		, f_edad_deudor numeric(4) null
 		, f_compromiso_vencido datetime null
+		, f_DNP varchar(4) null
+		, f_DPP varchar(4) null
+		, f_IP varchar(4) null
+		, f_menor_per_deuda datetime null
+		, f_mayor_per_deuda datetime null
+		, f_tipo_deudor varchar(30) null
 		, primary key (rut_deudor)
 	)
 
@@ -74,7 +80,9 @@ into #origen_cotiz_empl
 from
 (
 --Deuda Cotizaciones afiliados (personas)
-select top 100 cot_rut as rut, sum(DEC_PACTADO	- DEC_PAGADO) as deuda
+select 
+--top 100 
+cot_rut as rut, sum(DEC_PACTADO	- DEC_PAGADO) as deuda
 from deuda_cotizante with (nolock)
 where epa_rut is null
 --and cot_rut = ' 127968284'
@@ -82,7 +90,9 @@ group by cot_rut
 having sum(DEC_PACTADO	- DEC_PAGADO) > 0
 union
 --Deuda Cotizaciones Empresas (empleadores)
-select top 100 epa_rut as rut, sum(DEC_PACTADO	- DEC_PAGADO) as deuda 
+select
+--top 100 
+epa_rut as rut, sum(DEC_PACTADO	- DEC_PAGADO) as deuda 
 from deuda_cotizante with (nolock) 
 where epa_rut is not null
 --and epa_rut = ' 127968284'
@@ -97,7 +107,9 @@ CREATE NONCLUSTERED INDEX IX_origen_cotiz_empl_rut ON #origen_cotiz_empl (rut)
 
 --2.- ORIGEN LUR 
 --CONJUNTO LUR  (7491 rows affected)
-select top 100 DDR_rut rut, sum(deu_monto) deuda_lur
+select 
+--top 100 
+DDR_rut rut, sum(deu_monto) deuda_lur
 INTO #origen_lur
 from dbo.GCDF_DEUDA gd with (nolock)
 where deu_monto > 0
@@ -109,7 +121,9 @@ CREATE NONCLUSTERED INDEX IX_origen_lur_rut ON #origen_lur (rut)
 
 --2.- ORIGEN CHQ 
 --CONJUNTO chq  (2029 rows affected)
-select top 100 DDR_rut RUT, sum(deu_monto) deuda_chq
+select
+--top 100 
+DDR_rut RUT, sum(deu_monto) deuda_chq
 INTO #origen_chq
 from dbo.GCDF_DEUDA gd with (nolock)
 where deu_monto > 0
@@ -133,7 +147,9 @@ SELECT RUT FROM #origen_chq
 
 --lUEGO QUE TENEMOS EL CONJUNTO FINAL DE RUT SIN REPETIR , HAREMOS UNA TEMPORAL TFU
 -- Nota: 20.437 reg pero todos me dan cero.
-select TOP 100 dt.cot_rut rut, convert(numeric(12),SUM(ROUND(DTC_MONTO * dbo.f_get_ufmes(getdate()),0)) )  as saldo_tfu 
+select
+--TOP 100 
+dt.cot_rut rut, convert(numeric(12),SUM(ROUND(DTC_MONTO * dbo.f_get_ufmes(getdate()),0)) )  as saldo_tfu 
 into #TFU
 from DEVOLUCION_TFU_CUOTA dt with (nolock)
 join #tabla_final
@@ -273,9 +289,25 @@ SET f_supervisor_asig = #f_supervisor_asig.sco_codigo
 from #f_supervisor_asig
 where cobrador_asignado_lur_chq = #f_supervisor_asig.cob_codigo
 
-/*
-	Tipo Deudor	Si tiene contrato no vigente es VIGENTE, si tiene contrato pero no está vigente es NO VIGENTE y en otro caso es EMPRESA
-*/
+--	Tipo Deudor	Si tiene contrato no vigente es VIGENTE, si tiene contrato pero no está vigente es NO VIGENTE y en otro caso es EMPRESA
+select distinct cot_rut rut
+, case when (c.con_inivig <= getdate()
+         and (c.con_finvig >= getdate() or c.con_finvig is null)
+		 ) then 'VIGENTE'
+		 ELSE 'NO VIGENTE' END as vigencia
+into #vigencia_personas
+from contrato c with (nolock)
+where con_ultimo = 'S'
+
+UPDATE #tabla_final 
+SET f_tipo_deudor = #vigencia_personas.vigencia
+from #vigencia_personas
+where rut_deudor = #vigencia_personas.rut
+
+UPDATE #tabla_final 
+SET f_tipo_deudor = 'EMPRESA'
+from #tabla_final
+where f_tipo_deudor IS NULL
 
 --	Gestion 29	SELECT * FROM GESTION_COBRANZA WHERE TGC_CODIGO=29 (en el mes en curso)
 
@@ -315,17 +347,46 @@ where rut_deudor = #f_compromiso_vencido.rut
 	 WHEN DEC_TIPO_DEUDA='NP' AND DEC_PAGADO=0 THEN 'IP' END 
 FROM DEUDA_COTIZANTE"
 
+
+select * from DEUDA_COTIZANTE
 */
---	Menor Periodo Deuda (cotiozaciones)	DEUDA_COTIZANTE, MIN(PPC_PERIODO)
---	Mayor Periodo Deuda (cotiozaciones)	DEUDA_COTIZANTE, MAX(PPC_PERIODO)
+
+
+SELECT 
+    cot_rut rut,
+    MAX(CASE WHEN DEC_TIPO_DEUDA = 'DNP' THEN DEC_TIPO_DEUDA ELSE NULL END) AS DNP,
+    MAX(CASE WHEN DEC_TIPO_DEUDA = 'NP' AND DEC_PAGADO > 0 THEN 'DPP' ELSE NULL END) AS DPP,
+    MAX(CASE WHEN DEC_TIPO_DEUDA = 'NP' AND DEC_PAGADO = 0 THEN 'IP' ELSE NULL END) AS IP
+into #f_tipo_deuda
+FROM DEUDA_COTIZANTE WITH (NOLOCK)
+GROUP BY cot_rut
+
+UPDATE #tabla_final 
+SET f_dnp = #f_tipo_deuda.dnp
+, f_dpp = #f_tipo_deuda.dpp
+, f_ip = #f_tipo_deuda.ip
+from #f_tipo_deuda
+where rut_deudor = #f_tipo_deuda.rut
+
+
+
+--	Menor Periodo Deuda (cotiozaciones)	DEUDA_COTIZANTE, MIN(DEC_PERIODO)
+--	Mayor Periodo Deuda (cotiozaciones)	DEUDA_COTIZANTE, MAX(DEC_PERIODO)
 --select * from deuda_cotizante
 
---select top 100 cot_rut as rut, MIN(PPC_PERIODO) as min_ppc_periodo, MAX(PPC_PERIODO) max_ppc_periodo
---from deuda_cotizante with (nolock)
+select 
+--top 100 
+cot_rut as rut, MIN(DEC_PERIODO) as menor_per_deuda, MAX(DEC_PERIODO) mayor_per_deuda
+into #menor_mayor_deuda
+from deuda_cotizante with (nolock)
 --where epa_rut is null
---group by cot_rut
---having sum(DEC_PACTADO	- DEC_PAGADO) > 0
+group by cot_rut
 
+UPDATE #tabla_final 
+SET f_menor_per_deuda = #menor_mayor_deuda.menor_per_deuda
+, f_mayor_per_deuda = #menor_mayor_deuda.mayor_per_deuda
+from #menor_mayor_deuda
+where rut_deudor = #menor_mayor_deuda.rut
 
 
 
