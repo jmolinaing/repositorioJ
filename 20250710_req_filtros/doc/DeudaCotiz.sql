@@ -1,0 +1,51 @@
+
+DROP TABLE #deuda_cotiz_empl
+GO
+
+--Obtiene la deuda de cada COTIZANTE cuya responsabilidad de pago es de algún empleador
+SELECT  COT_RUT, 
+	DEC_PERIODO,
+	SUM(CASE WHEN EPA_RUT IS NOT NULL THEN DEC_PACTADO - DEC_PAGADO END) AS DEUDA_EMPLEADOR
+INTO #DEUDA_COTIZ_EMPL
+FROM DEUDA_COTIZANTE 
+WHERE EPA_RUT IS NOT NULL
+GROUP BY  COT_RUT, DEC_PERIODO
+
+
+ CREATE INDEX IDX_1 ON #deuda_cotiz_empl(COT_RUT,DEC_PERIODO)
+
+--Obtiene los registros de deudores desde DEUDA_COTIZANTE, pero restando a los registros de cotizantes (EPA_RUT IS NULL) el monto de la deuda cuya responsabilidad es de algún empleador
+--y filtramos sólo aquellos registros que quedan con deuda > 0
+
+SELECT 
+	DC.DEC_RUT,
+	DC.DEC_PERIODO,
+	CASE
+		WHEN DC.DEC_TIPO_DEUDA = 'DNP' THEN 'DNP'
+			WHEN DC.DEC_TIPO_DEUDA = 'NP' AND DC.DEC_PAGADO=0 THEN 'IP'
+		ELSE 'DPP'	 
+	END AS DEC_TIPO_DEUDA,
+	CASE WHEN EPA_RUT  IS NOT NULL THEN 'EMPRESA' ELSE 'COTIZANTE' END AS TIPO_DEUDOR ,
+	DEC_TIPO_COTIZANTE,
+	(coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) as DEC_DEUDA,
+	(coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) + 
+		ROUND((CASE WHEN (INTERESES.INT_REAJUSTE < 0) OR (INTERESES.INT_REAJUSTE IS NULL) THEN 0 ELSE INTERESES.INT_REAJUSTE END) / 100 * ((coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0)), 0) +
+		ROUND((CASE WHEN (INTERESES.INT_INTERES  < 0) OR (INTERESES.INT_INTERES IS NULL ) THEN 0 ELSE INTERESES.INT_INTERES  END) / 100 * ((coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0)), 0) +
+		ROUND((CASE WHEN (INTERESES.INT_RECARGO < 0)  OR (INTERESES.INT_RECARGO IS NULL)  THEN 0 ELSE INTERESES.INT_RECARGO END)  / 100 * ((coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0)), 0) 
+	AS DEUDA_REAJUSTADA
+INTO #TMP_DEUDA_COTIZANTE
+FROM DEUDA_COTIZANTE DC
+	LEFT JOIN #deuda_cotiz_empl D 
+		ON DC.COT_RUT=D.COT_RUT AND DC.DEC_PERIODO=D.DEC_PERIODO AND DC.EPA_RUT IS NULL
+	LEFT JOIN INTERESES (NOLOCK) ON INTERESES.INT_PPC_PERIODO = DC.DEC_PERIODO AND INTERESES.INT_FECHA_PAGO = CONVERT(CHAR(8), GETDATE(),112)
+WHERE (coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) >0
+
+
+
+select * from #TMP_DEUDA_COTIZANTE		--(1555725 filas afectadas) 1:29
+	
+WHERE DEC_RUT = ' 17772792K'
+
+
+select DEC_RUT, COUNT(*) from #TMP_DEUDA_COTIZANTE
+GROUP BY DEC_RUT
