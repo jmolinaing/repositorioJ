@@ -96,8 +96,7 @@ FROM DEUDA_COTIZANTE
 WHERE EPA_RUT IS NOT NULL
 GROUP BY  COT_RUT, DEC_PERIODO
 
-
- CREATE INDEX IDX_1 ON #deuda_cotiz_empl(COT_RUT,DEC_PERIODO)
+CREATE INDEX IDX_1 ON #deuda_cotiz_empl(COT_RUT,DEC_PERIODO)
 
 --Obtiene los registros de deudores desde DEUDA_COTIZANTE, pero restando a los registros de cotizantes (EPA_RUT IS NULL) el monto de la deuda cuya responsabilidad es de algún empleador
 --y filtramos sólo aquellos registros que quedan con deuda > 0

@@ -44,8 +44,13 @@ WHERE (coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_emplea
 
 select * from #TMP_DEUDA_COTIZANTE		--(1555725 filas afectadas) 1:29
 	
-WHERE DEC_RUT = ' 17772792K'
+--WHERE DEC_RUT = ' 17772792K'
 
 
 select DEC_RUT, COUNT(*) from #TMP_DEUDA_COTIZANTE
 GROUP BY DEC_RUT
+having COUNT(*) = 3
+
+
+select * from #TMP_DEUDA_COTIZANTE
+WHERE DEC_RUT = ' 170132777'
