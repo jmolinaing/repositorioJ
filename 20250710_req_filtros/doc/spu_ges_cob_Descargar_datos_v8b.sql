@@ -34,8 +34,7 @@ BEGIN
 --#TABLA_FINAL: TABLA DEL RESULTADO FINAL.
 
 	create table #tabla_final
-	(
-		rut_deudor char(10) not null
+	(	rut_deudor char(10) not null
 		, nombre_deudor varchar(100) null
 		, email_destinatario varchar(100) null
 		, deuda_cotizaciones numeric(15) null
@@ -65,6 +64,7 @@ BEGIN
 		, menor_per_deuda datetime null
 		, mayor_per_deuda datetime null
 		, tipo_deudor varchar(30) null
+		, tipo_empresa varchar(30) null
 		--, primary key (rut_deudor)
 	)
 
@@ -94,7 +94,7 @@ SELECT
 			WHEN DC.DEC_TIPO_DEUDA = 'NP' AND DC.DEC_PAGADO=0 THEN 'IP'
 		ELSE 'DPP'	 
 	END AS DEC_TIPO_DEUDA,
-	CASE WHEN EPA_RUT  IS NOT NULL THEN 'EMPRESA' ELSE 'COTIZANTE' END AS TIPO_DEUDOR ,
+	CASE WHEN EPA_RUT  IS NOT NULL THEN 'EMPRESA' ELSE 'COTIZANTE' END AS tipo_empresa ,		--TIPO_DEUDOR se cambia a tipo_empresa
 	DEC_TIPO_COTIZANTE,
 	(coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) as DEC_DEUDA,
 	(coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) + 
@@ -111,66 +111,10 @@ WHERE (coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_emplea
 
 CREATE INDEX ix_TMP_DEUDA_COTIZANTE ON #TMP_DEUDA_COTIZANTE(DEC_RUT)
 --select * from #TMP_DEUDA_COTIZANTE ORDER BY 1		--1.555.725 reg en 3min
-
---SELECT DEC_RUT, EMPRESA, COTIZANTE
---FROM
---(
---select DEC_RUT, 
---		sum(CASE WHEN TIPO_DEUDOR = 'EMPRESA' THEN 1 ELSE 0 END) AS EMPRESA,
---		sum(CASE WHEN TIPO_DEUDOR = 'COTIZANTE'  THEN 1 ELSE 0 END) AS COTIZANTE
---from #TMP_DEUDA_COTIZANTE 
---GROUP BY dec_rut
---) A
---WHERE EMPRESA = COTIZANTE
-
 --SELECT * FROM #TMP_DEUDA_COTIZANTE WHERE DEC_RUT = '  85213016'
 
 
 --3.- --1.-TABLA_ORIGEN1: solo debe haber un rut por registro , se guardara en #origen_cotiz_empl
-SELECT 
-    base.dec_rut as rut,
-    base.dec_deuda as deuda,
-    tipo.DNP dnp,
-    tipo.DPP dpp,
-    tipo.IP ip,
-    peri.menor_per_deuda as menor_per_deuda,
-    peri.mayor_per_deuda as mayor_per_deuda
-	, tipod.TIPO_DEUDOR
---into #origen_cotiz_empl
-FROM 
-    (SELECT dec_rut , 
-           SUM(isnull(DEC_DEUDA, 0)) AS dec_deuda
-     FROM  #TMP_DEUDA_COTIZANTE WITH (NOLOCK)
-     GROUP BY dec_rut
-     --HAVING SUM(DEC_DEUDA) > 0
-    ) base
-LEFT JOIN
-    (SELECT dec_rut AS rut,
-		sum(CASE WHEN DEC_TIPO_DEUDA = 'DNP' THEN 1 ELSE 0 END) AS DNP,
-		sum(CASE WHEN DEC_TIPO_DEUDA = 'DPP'  THEN 1 ELSE 0 END) AS DPP,
-		sum(CASE WHEN DEC_TIPO_DEUDA = 'IP'  THEN 1 ELSE 0 END) AS IP
-     FROM #TMP_DEUDA_COTIZANTE WITH (NOLOCK)
-     GROUP BY dec_rut
-    ) tipo
-    ON base.dec_rut = tipo.rut
-LEFT JOIN
-    (SELECT dec_rut AS rut, 
-         MIN(DEC_PERIODO) AS menor_per_deuda, 
-         MAX(DEC_PERIODO) AS mayor_per_deuda
-     FROM #TMP_DEUDA_COTIZANTE WITH (NOLOCK)
-     GROUP BY dec_rut
-    ) peri
- ON base.dec_rut = peri.rut
- LEFT JOIN
-    (SELECT dec_rut AS rut, 
-         MAX(TIPO_DEUDOR) AS TIPO_DEUDOR
-     FROM #TMP_DEUDA_COTIZANTE WITH (NOLOCK)
-     GROUP BY dec_rut
-    ) tipod
- ON base.dec_rut = tipod.rut
-
-
-
 SELECT 
     d.dec_rut AS rut,
     SUM(ISNULL(d.dec_deuda, 0)) AS deuda,
@@ -179,13 +123,10 @@ SELECT
     SUM(CASE WHEN d.dec_tipo_deuda = 'IP' THEN 1 ELSE 0 END) AS ip,
     MIN(d.dec_periodo) AS menor_per_deuda,
     MAX(d.dec_periodo) AS mayor_per_deuda, 
-	MAX(D.TIPO_DEUDOR) as TIPO_DEUDOR
---INTO #origen_cotiz_empl
+	MAX(D.tipo_empresa) as tipo_empresa
+INTO #origen_cotiz_empl
 FROM #TMP_DEUDA_COTIZANTE d
 GROUP BY d.dec_rut
-
-
-
 
 -- Crear índice no agrupado después de insertar los datos para evitar ralentizaciones durante la inserción y acelerar consultas posteriores.
 create nonclustered index ix_origen_cotiz_empl_rut on #origen_cotiz_empl (rut)
@@ -210,7 +151,7 @@ create nonclustered index ix_origen_chq_rut on #origen_lur_chq (rut)
 
 --5.- INSERTAR #tabla_final LOS RUTS DE LOS 2 TABLAS_ORIGENES: #origen_cotiz_empl FULL OUTER JOIN #origen_lur_chq.
 
-insert #tabla_final (rut_deudor, deuda_cotizaciones, dnp, dpp, ip, menor_per_deuda, mayor_per_deuda, deuda_lur, deuda_chq)
+insert #tabla_final (rut_deudor, deuda_cotizaciones, dnp, dpp, ip, menor_per_deuda, mayor_per_deuda, deuda_lur, deuda_chq, tipo_empresa)
 SELECT
     COALESCE(a.rut, b.rut) AS rut,
     a.deuda,
@@ -221,8 +162,10 @@ SELECT
     a.mayor_per_deuda,
     b.deuda_lur,
     b.deuda_chq
+	, a.tipo_empresa
 FROM
     (
+		--UNIVERSO DEUDA COTIZACIONES
 		SELECT rut,
 			 deuda,
 			dnp,
@@ -230,10 +173,12 @@ FROM
 			ip,
 			menor_per_deuda,
 			mayor_per_deuda
+			, tipo_empresa
 		from #origen_cotiz_empl
     ) a
-FULL OUTER JOIN
+	FULL OUTER JOIN
     (
+		--UNIVERSO LUR
         SELECT
              rut,
             deuda_lur,
@@ -246,6 +191,16 @@ ON a.rut = b.rut;
 create nonclustered index ix_tabla_final_rut on #tabla_final (rut_deudor)
 --select * from #tabla_final		--177.234 reg en 16 seg
 
+/* ejemplos de rut que estan en los dos universos:  130367534,  130381049
+SELECT c.rut, *
+from
+#origen_cotiz_empl C
+join #origen_lur_chq L
+	on c.rut = l.rut
+where  c.rut = ' 130367534'
+
+select * from #tabla_final where rut_deudor = ' 130367534'
+*/
 
 --6.- TABLA TFU
 declare @uf_mes numeric(10,2)
@@ -265,22 +220,22 @@ create nonclustered index ix_tfu_rut on #tfu (rut)
 
 --7.- #compromiso: Obtener compromisos de pago GEC_COMPROM_MONTO y GEC_COMPROM_FECHA, tengo que ir a buscar el ultimo para e rut fecha digita
 
-	select gc.ddr_rut rut, gc.GEC_COMPROM_MONTO monto, gc.GEC_COMPROM_FECHA fecha
-	into #compromiso
+select gc.ddr_rut rut, gc.GEC_COMPROM_MONTO monto, gc.GEC_COMPROM_FECHA fecha
+into #compromiso
+from GESTION_COBRANZA gc with (nolock)
+join
+(
+	select ddr_rut, max(GEC_FECDIGITA) GEC_FECDIGITA
 	from GESTION_COBRANZA gc with (nolock)
-	join
-	(
-		select ddr_rut, max(GEC_FECDIGITA) GEC_FECDIGITA
-		from GESTION_COBRANZA gc with (nolock)
-		join #tabla_final t
-			on gc.DDR_RUT = t.rut_deudor
-		where tgc_codigo=29
-		and GEC_COMPROM_MONTO is not null
-		and GEC_COMPROM_FECHA is not null
-		group by ddr_rut
-	) a
-	on gc.DDR_RUT = a.DDR_RUT
-	and gc.GEC_FECDIGITA = a.GEC_FECDIGITA
+	join #tabla_final t
+		on gc.DDR_RUT = t.rut_deudor
+	where tgc_codigo=29
+	and GEC_COMPROM_MONTO is not null
+	and GEC_COMPROM_FECHA is not null
+	group by ddr_rut
+) a
+on gc.DDR_RUT = a.DDR_RUT
+and gc.GEC_FECDIGITA = a.GEC_FECDIGITA
 
 create nonclustered index ix_compromiso_rut on #compromiso (rut)
 --select * from #compromiso		--42.212 reg en 2 seg
@@ -302,8 +257,6 @@ create nonclustered index ix_cobrador_asig_rut on #cobrador_asig (rut)
 
 
 -- ZONA DE TABLAS FILTROS: COLUMNAS EN LA SALIDA PARA FITRAR 
-		
--- FILTRO Equipo : CONSULTAR A ALEX *************
 
 --9.- FILTRO Supervisor: Obtener el SUP. vigente desde la tabla COBRADOR_SUP_ASIG
 
@@ -343,11 +296,11 @@ create nonclustered index ix_f_vigencia_personas_rut on #f_vigencia_personas(rut
 
 --11.- FILTRO Gestion 29	SELECT * FROM GESTION_COBRANZA WHERE TGC_CODIGO=29 (en el mes en curso)
 
-	declare @PrimerDiaDelMes datetime
-	declare @PrimerDiaDelMesSgte datetime
+declare @PrimerDiaDelMes datetime
+declare @PrimerDiaDelMesSgte datetime
 
-	SELECT @PrimerDiaDelMes = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) AS DATE) 
-	SELECT @PrimerDiaDelMesSgte = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()) + 1, 0) AS DATE) 
+SELECT @PrimerDiaDelMes = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) AS DATE) 
+SELECT @PrimerDiaDelMesSgte = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()) + 1, 0) AS DATE) 
 
 	--select @PrimerDiaDelMes, @PrimerDiaDelMesSgte
 
@@ -395,15 +348,7 @@ create nonclustered index ix_f_deuda_lur_con_credito_rut on #f_deuda_lur_con_cre
 
 -- FILTRO Tipo Empresa: PREGUNTAR A ALEX	******
 -- FILTRO Rubro: PREGUNTAR A ALEX		*****
-
-
-----14 UPDATE monto_posible_compensar
-----17.850 en 1 seg
---UPDATE #tabla_final
---set monto_posible_compensar = case when ( (isnull(DEUDA_cotizaciones, 0) + isnull(DEUDA_lur, 0)) >= #tfu.saldo_tfu  ) then  #tfu.saldo_tfu else (isnull(DEUDA_cotizaciones, 0) + isnull(DEUDA_lur, 0)) end
---from #tfu
---where rut_deudor = #tfu.rut
-
+-- FILTRO Equipo : CONSULTAR A ALEX *************
 
 
 --15 177.234 filas en 8 seg
@@ -424,7 +369,8 @@ SET
     fono_ejecutivo = c2.cob_FONO,
     fono_contacto = c2.cob_celular,
     ciu_codigo_reside = d.CIU_CODIGO
-   --, edad_deudor = dbo.f_edad(b.BNF_NACTO, GETDATE())
+   , edad_deudor = dbo.f_edad(b.BNF_NACTO, GETDATE())		--***
+   --, edad_deudor = (DATEDIFF(year,b.BNF_NACTO,GETDATE() )+ case when	( Month(GETDATE()) < Month(b.BNF_NACTO) Or (Month(GETDATE()) = Month(b.BNF_NACTO) And Day(GETDATE()) < day(b.BNF_NACTO))) Then -1 else 0 end)
 FROM #tabla_final tf
 LEFT JOIN #tfu tu ON tf.rut_deudor = tu.rut
 LEFT JOIN #compromiso c ON tf.rut_deudor = c.rut
@@ -442,8 +388,6 @@ LEFT JOIN BENEFICIARIO b ON b.BNF_RUT = d.DDR_RUT;
 
 
 --select * #tabla_final		--177.234 reg en 1:14 seg
-
-
 
 
 --SELECT 	rut_deudor
@@ -512,15 +456,16 @@ SELECT 	rut_deudor
 		, menor_per_deuda 
 		, mayor_per_deuda 
 		, tipo_deudor 
+		, tipo_empresa
 		FROM #tabla_final
 		'
 
-				exec sp_executesql @sql1
-				if @@ERROR<>0
-					begin
-							rollback
-							return 
-					end
+		exec sp_executesql @sql1
+		if @@ERROR<>0
+			begin
+					rollback
+					return 
+			end
 
 
 END
