@@ -6,7 +6,7 @@
  fecha creación		:	                                                    
  descripción		:																		
 ========================================================================================*/
-/*	execute spu_ges_cob_Descargar_datos_v9 1
+/*	execute spu_ges_cob_Descargar_datos_v9 19
 
 --177.234 filas en 2:30 min	*/
 
@@ -22,11 +22,17 @@ set @sqlwhere = ''
 ----0.- PLANILLA_____________________________
 ---- REVISAR SI EXISTE 
 
---IF NOT EXISTS (SELECT 1 FROM GCO_ENVMSG_PLANTILLA WITH (NOLOCK) WHERE EPL_CODIGO = @EPL_CODIGO)
---BEGIN
---	SELECT 'NO EXISTE PLANTILLA'
---	RETURN 
---END
+IF NOT EXISTS (SELECT 1 FROM GCO_ENVMSG_PLANTILLA WITH (NOLOCK) WHERE EPL_CODIGO = @EPL_CODIGO)
+BEGIN
+	SELECT 'NO EXISTE PLANTILLA'
+	RETURN 
+END
+
+IF NOT EXISTS (SELECT 1 FROM GCO_ENVMSG_FILTRO WITH (NOLOCK) WHERE EPL_CODIGO = @EPL_CODIGO)
+BEGIN
+	SELECT 'NO EXISTE FILTROS EN LA PLANTILLA'
+	RETURN 
+END
 
 --/*
 ---- SELECT * FROM GCO_ENVMSG_CONCEPTO
@@ -57,6 +63,10 @@ if object_id('tempdb..#FILTROS', 'u') is not null drop table #FILTROS
 DECLARE @CODIGO_CONCEPTO numeric(5, 0)
 DECLARE @NOMBRE_VALOR NVARCHAR(4000)
 DECLARE @UF_VALOR NUMERIC(8, 2)
+
+declare @fecha_hoy datetime
+set @fecha_hoy = CAST( ( CAST(GETDATE() AS DATE)) AS DATETIME)
+print @fecha_hoy
 
 ----@UF_VALOR = CAST(GETDATE() AS DATE)
 SELECT @UF_VALOR = UF_VALOR FROM UF WITH (NOLOCK) WHERE UF_FECHA = CAST( ( CAST(GETDATE() AS DATE)) AS DATETIME)
@@ -118,32 +128,45 @@ BEGIN
 --		--Equipo judicial
 
 
---	--CONCEPTO 4	Supervisor	S
+--	--CONCEPTO 4:	Supervisor	S
 --		--A.SOTO
 --		--E.CABELLO
 --		--C.MORALES
 
+--	--select * from gco_envmsg_filtro WHERE epl_codigo  = 4
 --	--select * from gco_envmsg_concepto where eco_codigo = 4
+--update gco_envmsg_concepto SET eco_tipo_seleccion = 'M'  where eco_codigo = 4
 
---	IF @CODIGO_CONCEPTO = 4 
---	BEGIN
---		--IF @NOMBRE_VALOR = 'A'
---		--BEGIN
---			set @sqlwhere = @sqlwhere + ' and supervisor_asig = '''+@NOMBRE_VALOR+''''
---		--END
---	END
+
+	DECLARE @F_SUPERVISOR VARCHAR(500)
+	SET @F_SUPERVISOR = ''
+
+	IF @CODIGO_CONCEPTO = 4 
+	BEGIN
+		SET @F_SUPERVISOR = replace(@NOMBRE_VALOR, '|', ',')
+
+		set @sqlwhere = @sqlwhere + ' and supervisor_asig in ('+@F_SUPERVISOR+')'
+
+	END
+
 
 --	--select * from gco_envmsg_concepto where eco_codigo = 5
 --	--select * from gco_envmsg_filtro where eco_codigo = 5
 
 --	--CONCEPTO 5 Cobrador Asignado	M
---	IF @CODIGO_CONCEPTO = 5 
---	BEGIN
---		--IF @NOMBRE_VALOR = 'A'
---		--BEGIN
---			set @sqlwhere = @sqlwhere + ' and COB_CODIGO = '+@NOMBRE_VALOR
---		--END
---	END
+
+	DECLARE @F_COBRADOR VARCHAR(500)
+	SET @F_COBRADOR = ''
+
+	IF @CODIGO_CONCEPTO = 5 
+	BEGIN
+		SET @F_COBRADOR = replace(@NOMBRE_VALOR, '|', ',')
+
+		set @sqlwhere = @sqlwhere + ' and COB_CODIGO in ('+@F_COBRADOR+')'
+
+	END
+
+
 
 --	--CONCEPTO 6 Grupo Deuda: VALORES A, B, C
 --	--1 Afiliados Vigentes GRUPO A (DEUDA <= A UF 1)	
@@ -162,6 +185,10 @@ BEGIN
 			IF @GRUPO_DEUDA = ''
 			BEGIN
 				SET @GRUPO_DEUDA = ' and deuda_cotizaciones <= '+cast(@UF_VALOR as varchar(20))
+			END
+			ELSE
+			BEGIN
+				set @GRUPO_DEUDA = @GRUPO_DEUDA + ' and deuda_cotizaciones <= '+cast(@UF_VALOR as varchar(20))
 			END
 		END
 
@@ -238,6 +265,10 @@ BEGIN
 			BEGIN
 				SET @TIPO_DEUDOR_VIG = 'VIGENTE'
 			END
+			ELSE
+			BEGIN
+				SET @TIPO_DEUDOR_VIG = @TIPO_DEUDOR_VIG+''','''+'VIGENTE'
+			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%2%'
@@ -269,6 +300,277 @@ BEGIN
 	END
 		
 
+--8	Con Gestión Cód.. 29	M
+--1 Con 
+--2 Sin 
+
+	DECLARE @F_GESTION VARCHAR(100)
+	SET @F_GESTION = ''
+
+	IF @CODIGO_CONCEPTO = 8 
+	BEGIN
+
+		IF @NOMBRE_VALOR LIKE '%1%'
+		BEGIN
+			IF @F_GESTION = ''
+			BEGIN
+				SET @F_GESTION = 'Si'
+			END
+			ELSE
+			BEGIN
+				SET @F_GESTION = @F_GESTION+''','''+'Si'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @F_GESTION = ''
+			BEGIN
+				SET @F_GESTION = 'No'
+			END
+			ELSE
+			BEGIN
+				SET @F_GESTION = @F_GESTION+''','''+'No'
+			END
+		END
+
+		set @sqlwhere = @sqlwhere + ' and gestion29 IN ('''+@F_GESTION+''')'
+	END
+
+--CONCEPTO = 9 Fecha Compromiso vencido
+--1.- Vencidos (Compromiso Hoy-1)
+--2.- No Vencidos (Compromiso >=Hoy)
+
+
+	DECLARE @F_COMPVENCIDO VARCHAR(300)
+	SET @F_COMPVENCIDO = ''
+
+	IF @CODIGO_CONCEPTO = 9 
+	BEGIN
+
+		IF @NOMBRE_VALOR LIKE '%1%'
+		BEGIN
+			IF @F_COMPVENCIDO = ''
+			BEGIN
+				--SET @F_COMPVENCIDO = ' and compromiso_vencido < '+cast@fecha_hoy
+				SET @F_COMPVENCIDO = ' and compromiso_vencido < convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
+			END
+			ELSE
+			BEGIN
+				SET @F_COMPVENCIDO = @F_COMPVENCIDO+' and compromiso_vencido < convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @F_COMPVENCIDO = ''
+			BEGIN
+				SET @F_COMPVENCIDO = ' and compromiso_vencido >= convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
+			END
+			ELSE
+			BEGIN
+				SET @F_COMPVENCIDO = @F_COMPVENCIDO+' and compromiso_vencido >= convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
+			END
+		END
+
+		set @sqlwhere = @sqlwhere + ' AND compromiso_vencido IS NOT NULL ' +@F_COMPVENCIDO
+	END
+		
+
+
+--CONCEPTO 10 Tipo de Deuda
+--1 Cotizaciones
+--2 Ley de Urgencia
+--3 Cheques Protestados
+--update gco_envmsg_concepto SET eco_tipo_seleccion = 'M'  where eco_codigo = 10
+
+
+	DECLARE @F_TIPODEUDA VARCHAR(300)
+	SET @F_TIPODEUDA = ''
+
+	IF @CODIGO_CONCEPTO = 10 
+	BEGIN
+
+		IF @NOMBRE_VALOR LIKE '%1%'
+		BEGIN
+			IF @F_TIPODEUDA = ''
+			BEGIN
+				SET @F_TIPODEUDA = ' and deuda_cotizaciones > 0'
+			END
+			ELSE
+			BEGIN
+				SET @F_TIPODEUDA = @F_TIPODEUDA+' and deuda_cotizaciones > 0'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @F_TIPODEUDA = ''
+			BEGIN
+				SET @F_TIPODEUDA = ' and deuda_lur > 0'
+			END
+			ELSE
+			BEGIN
+				SET @F_TIPODEUDA = @F_TIPODEUDA+' and deuda_lur > 0'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%3%'
+		BEGIN
+			IF @F_TIPODEUDA = ''
+			BEGIN
+				SET @F_TIPODEUDA = ' and deuda_chq > 0'
+			END
+			ELSE
+			BEGIN
+				SET @F_TIPODEUDA = @F_TIPODEUDA+' and deuda_chq > 0'
+			END
+		END
+
+		set @sqlwhere = @sqlwhere + @F_TIPODEUDA
+	END
+		
+
+
+--CONCEPTO 11 Tipo Deuda Cotizaciones
+--1 DNP
+--2 IP
+--3 DPP
+
+
+
+	SET @F_TIPODEUDA = ''
+
+	IF @CODIGO_CONCEPTO = 11 
+	BEGIN
+
+		IF @NOMBRE_VALOR LIKE '%1%'
+		BEGIN
+			IF @F_TIPODEUDA = ''
+			BEGIN
+				SET @F_TIPODEUDA = ' and DNP > 0'
+			END
+			ELSE
+			BEGIN
+				SET @F_TIPODEUDA = @F_TIPODEUDA+' and DNP > 0'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @F_TIPODEUDA = ''
+			BEGIN
+				SET @F_TIPODEUDA = ' and IP > 0'
+			END
+			ELSE
+			BEGIN
+				SET @F_TIPODEUDA = @F_TIPODEUDA+' and IP > 0'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%3%'
+		BEGIN
+			IF @F_TIPODEUDA = ''
+			BEGIN
+				SET @F_TIPODEUDA = ' and DPP > 0'
+			END
+			ELSE
+			BEGIN
+				SET @F_TIPODEUDA = @F_TIPODEUDA+' and DPP > 0'
+			END
+		END
+
+		set @sqlwhere = @sqlwhere + @F_TIPODEUDA
+	END
+
+
+
+
+
+--	--CONCEPTO 14 CIUDAD DE RESIDENCIA
+
+	SET @F_COBRADOR = ''
+
+	IF @CODIGO_CONCEPTO = 14 
+	BEGIN
+		SET @F_COBRADOR = replace(@NOMBRE_VALOR, '|', ',')
+
+		set @sqlwhere = @sqlwhere + ' and CIU_CODIGO_RESIDE in ('+@F_COBRADOR+')'
+
+	END
+
+
+
+
+--CONCEPTO 19 EDAD DEUDOR
+--1 18-25
+--2 26-40
+--3 41 - 55
+--4 Otros
+
+	SET @F_TIPODEUDA = ''
+
+	IF @CODIGO_CONCEPTO = 19 
+	BEGIN
+
+		IF @NOMBRE_VALOR LIKE '%1%'
+		BEGIN
+			IF @F_TIPODEUDA = ''
+			BEGIN
+				SET @F_TIPODEUDA = ' and EDAD_DEUDOR >= 18 and EDAD_DEUDOR <= 25 '
+			END
+			ELSE
+			BEGIN
+				SET @F_TIPODEUDA = @F_TIPODEUDA+' and EDAD_DEUDOR >= 18 and EDAD_DEUDOR <= 25 '
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @F_TIPODEUDA = ''
+			BEGIN
+				SET @F_TIPODEUDA = ' and EDAD_DEUDOR >= 26 and EDAD_DEUDOR <= 40 '
+			END
+			ELSE
+			BEGIN
+				SET @F_TIPODEUDA = @F_TIPODEUDA+' and EDAD_DEUDOR >= 26 and EDAD_DEUDOR <= 40 '
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%3%'
+		BEGIN
+			IF @F_TIPODEUDA = ''
+			BEGIN
+				SET @F_TIPODEUDA = ' and EDAD_DEUDOR >= 41 and EDAD_DEUDOR <= 55 '
+			END
+			ELSE
+			BEGIN
+				SET @F_TIPODEUDA = @F_TIPODEUDA+' and EDAD_DEUDOR >= 41 and EDAD_DEUDOR <= 55 '
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%4%'
+		BEGIN
+			IF @F_TIPODEUDA = ''
+			BEGIN
+				SET @F_TIPODEUDA = ' and EDAD_DEUDOR < 18 and EDAD_DEUDOR > 55 '
+			END
+			ELSE
+			BEGIN
+				SET @F_TIPODEUDA = @F_TIPODEUDA+' and EDAD_DEUDOR < 18 and EDAD_DEUDOR > 55 '
+			END
+		END
+
+		set @sqlwhere = @sqlwhere + @F_TIPODEUDA
+	END
+
+
+
+
+
+
+
+
 
 	FETCH NEXT FROM CUR_FILTROS INTO @CODIGO_CONCEPTO, @NOMBRE_VALOR
 
@@ -277,9 +579,18 @@ END
 CLOSE CUR_FILTROS
 DEALLOCATE CUR_FILTROS
 
-PRINT @sqlwhere
---return
 
+
+
+--REGLA SI NO HAY FILTROS, NO TRAER NADA
+IF isnull(@sqlwhere, '') = '' 
+BEGIN
+	SET @sqlwhere = 'AND 1 = 2'
+END
+
+PRINT '_'+@sqlwhere+'_'
+
+--return
 --0.- PLANILLA_____________________________
 
 
@@ -633,6 +944,7 @@ SET
     cobrador_asignado_lur_chq = c_asig.cob_codigo,
     supervisor_asig = sup.sco_codigo,
     tipo_deudor = COALESCE(vig.vigencia, 'EMPRESA'),
+   -- gestion29 = COALESCE(ges.gestion29, 'No'),
     gestion29 = ges.gestion29,
     compromiso_vencido = compv.fecha,
     deuda_lur_con_credito = dlcc.deuda_lur_con_credito,
