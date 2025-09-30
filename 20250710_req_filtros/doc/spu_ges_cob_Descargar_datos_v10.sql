@@ -6,52 +6,55 @@
  fecha creación		:	                                                    
  descripción		:																		
 ========================================================================================*/
-/*	execute spu_ges_cob_Descargar_datos_v9 19
+/*	execute spu_ges_cob_Descargar_datos_v10 9
 
 --177.234 filas en 2:30 min	*/
 
-alter procedure [dbo].[spu_ges_cob_Descargar_datos_v9] 
+ALTER procedure [dbo].[spu_ges_cob_Descargar_datos_v10] 
 @epl_codigo varchar(50) = null
 as
 BEGIN	
 	set nocount on;
 
 declare @sqlwhere nvarchar(4000)
-set @sqlwhere = ''
-
-----0.- PLANILLA_____________________________
----- REVISAR SI EXISTE 
-
-IF NOT EXISTS (SELECT 1 FROM GCO_ENVMSG_PLANTILLA WITH (NOLOCK) WHERE EPL_CODIGO = @EPL_CODIGO)
-BEGIN
-	SELECT 'NO EXISTE PLANTILLA'
-	RETURN 
-END
-
-IF NOT EXISTS (SELECT 1 FROM GCO_ENVMSG_FILTRO WITH (NOLOCK) WHERE EPL_CODIGO = @EPL_CODIGO)
-BEGIN
-	SELECT 'NO EXISTE FILTROS EN LA PLANTILLA'
-	RETURN 
-END
-
-if object_id('tempdb..#FILTROS', 'u') is not null drop table #FILTROS
-
-DECLARE @CODIGO_CONCEPTO numeric(5, 0)
-DECLARE @NOMBRE_VALOR NVARCHAR(4000)
-DECLARE @UF_VALOR NUMERIC(8, 2)
-
+declare @sqlfiltro nvarchar(1000)
+declare @codigo_concepto numeric(5, 0)
+declare @nombre_valor nvarchar(4000)
+declare @uf_valor numeric(8, 2)
 declare @fecha_hoy datetime
-set @fecha_hoy = CAST( ( CAST(GETDATE() AS DATE)) AS DATETIME)
-print @fecha_hoy
+declare @PrimerDiaDelMes datetime
+declare @PrimerDiaDelMesSgte datetime
 
-----@UF_VALOR = CAST(GETDATE() AS DATE)
-SELECT @UF_VALOR = UF_VALOR FROM UF WITH (NOLOCK) WHERE UF_FECHA = CAST( ( CAST(GETDATE() AS DATE)) AS DATETIME)
+SELECT @PrimerDiaDelMes = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) AS DATE) 
+SELECT @PrimerDiaDelMesSgte = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()) + 1, 0) AS DATE) 
 
-IF @UF_VALOR IS NULL
-BEGIN
-	SELECT 'NO EXISTE UF'
-	RETURN 
-END
+
+if object_id('tempdb..#filtros', 'u') is not null drop table #filtros
+
+--if not exists (select 1 from gco_envmsg_plantilla with (nolock) where epl_codigo = @epl_codigo)
+--begin
+--	select 'no existe plantilla'
+--	return 
+--end
+
+--if not exists (select 1 from gco_envmsg_filtro with (nolock) where epl_codigo = @epl_codigo)
+--begin
+--	select 'no existe filtros en la plantilla'
+--	return 
+--end
+
+--set @fecha_hoy = cast( ( cast(getdate() as date)) as datetime)
+
+--select @uf_valor = uf_valor from uf with (nolock) where uf_fecha = @fecha_hoy
+
+--if @uf_valor is null
+--begin
+--	select 'no existe uf'
+--	return 
+--end
+
+
+
 
 --/*
 ---- SELECT * FROM GCO_ENVMSG_CONCEPTO
@@ -78,36 +81,12 @@ END
 --*/
 
 
-
-----v1
--- --CREATE TABLE #FILTROS(       
--- --CODIGO_CONCEPTO numeric(5, 0) NOT NULL,    
--- --NOMBRE_CONCEPTO varchar(100) NULL,    
--- --CODIGO_VALOR varchar(100)  NULL,    
--- --NOMBRE_VALOR varchar(100)  NULL,    
--- --SELECCIONADO VARCHAR(1) NULL  
--- --, ECO_TIPO_SELECCION VARCHAR(1) NULL  
--- --)    
-
-
--- --INSERT #FILTROS
--- --EXECUTE spu_ges_cob_mensajes_filtros_consultar @epl_codigo
--- --DELETE #FILTROS WHERE SELECCIONADO = 'N'
-
--- --SELECT * FROM #FILTROS
-
--- --v2
-
-
-
+set @sqlwhere = ''
+set @sqlfiltro = ''
 
 --CURSOR
 DECLARE CUR_FILTROS CURSOR FOR
 	 
-	 --SELECT CODIGO_CONCEPTO
-	 --, NOMBRE_VALOR
-	 --FROM #FILTROS
-
 	 SELECT ECO_CODIGO
 	 , EFI_VALOR
 	 FROM GCO_ENVMSG_FILTRO WITH (NOLOCK)
@@ -121,54 +100,30 @@ FETCH NEXT FROM CUR_FILTROS INTO @CODIGO_CONCEPTO, @NOMBRE_VALOR
 WHILE @@FETCH_STATUS = 0
 BEGIN
 
---	--PRINT @CODIGO_CONCEPTO
---	--PRINT @NOMBRE_VALOR
-
---	--CONCEPTO 3: GRUPO o Equipo
---		--Equipo Interno
---		--Equipo Stock
---		--Equipo judicial
+--CONCEPTO 3: GRUPO o Equipo
+	--Equipo Interno
+	--Equipo Stock
+	--Equipo judicial
 
 
---	--CONCEPTO 4:	Supervisor	S
---		--A.SOTO
---		--E.CABELLO
---		--C.MORALES
+--CONCEPTO 4:	Supervisor	S
+	--A.SOTO
+	--E.CABELLO
+	--C.MORALES
 
---	--select * from gco_envmsg_filtro WHERE epl_codigo  = 4
---	--select * from gco_envmsg_concepto where eco_codigo = 4
---update gco_envmsg_concepto SET eco_tipo_seleccion = 'M'  where eco_codigo = 4
-
-
-	DECLARE @F_SUPERVISOR VARCHAR(500)
-	SET @F_SUPERVISOR = ''
+	set @sqlfiltro = ''
 
 	IF @CODIGO_CONCEPTO = 4 
 	BEGIN
-		SET @F_SUPERVISOR = replace(@NOMBRE_VALOR, '|', ',')
-
-		set @sqlwhere = @sqlwhere + ' and supervisor_asig in ('+@F_SUPERVISOR+')'
-
+		SET @sqlfiltro = replace(@NOMBRE_VALOR, '|', ',')
+		set @sqlwhere = @sqlwhere + ' and supervisor_asig in ('+@sqlfiltro+')'
 	END
-
-
---	--select * from gco_envmsg_concepto where eco_codigo = 5
---	--select * from gco_envmsg_filtro where eco_codigo = 5
-
---	--CONCEPTO 5 Cobrador Asignado	M
-
-	DECLARE @F_COBRADOR VARCHAR(500)
-	SET @F_COBRADOR = ''
 
 	IF @CODIGO_CONCEPTO = 5 
 	BEGIN
-		SET @F_COBRADOR = replace(@NOMBRE_VALOR, '|', ',')
-
-		set @sqlwhere = @sqlwhere + ' and COB_CODIGO in ('+@F_COBRADOR+')'
-
+		SET @sqlfiltro = replace(@NOMBRE_VALOR, '|', ',')
+		set @sqlwhere = @sqlwhere + ' and COB_CODIGO in ('+@sqlfiltro+')'
 	END
-
-
 
 --	--CONCEPTO 6 Grupo Deuda: VALORES A, B, C
 --	--1 Afiliados Vigentes GRUPO A (DEUDA <= A UF 1)	
@@ -176,129 +131,93 @@ BEGIN
 --	--3 Afiliados Vigentes GRUPO C (DEUDA > A UF 3)
 --	--select * from gco_envmsg_filtro where EPL_codigo = '1'
 
-	DECLARE @GRUPO_DEUDA VARCHAR(100)
-	SET @GRUPO_DEUDA = ''
-
 	IF @CODIGO_CONCEPTO = 6 
 	BEGIN
-
 		IF @NOMBRE_VALOR LIKE '%1%'	-- Afiliados Vigentes GRUPO A (DEUDA <= A UF 1)	
 		BEGIN
-			IF @GRUPO_DEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @GRUPO_DEUDA = ' and deuda_cotizaciones <= '+cast(@UF_VALOR as varchar(20))
+				SET @sqlfiltro = ' and deuda_cotizaciones <= '+cast(@UF_VALOR as varchar(20))
 			END
 			ELSE
 			BEGIN
-				set @GRUPO_DEUDA = @GRUPO_DEUDA + ' and deuda_cotizaciones <= '+cast(@UF_VALOR as varchar(20))
+				set @sqlfiltro = @sqlfiltro + ' and deuda_cotizaciones <= '+cast(@UF_VALOR as varchar(20))
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%2%'		--2 Afiliados Vigentes GRUPO B (DEUDA <= A UF 2)
 		BEGIN
-			IF @GRUPO_DEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @GRUPO_DEUDA = ' and deuda_cotizaciones <= '+cast(@UF_VALOR*2 as varchar(20))
+				SET @sqlfiltro = ' and deuda_cotizaciones <= '+cast(@UF_VALOR*2 as varchar(20))
 			END
 			ELSE
 			BEGIN
-				set @GRUPO_DEUDA = @GRUPO_DEUDA + ' and deuda_cotizaciones <= '+cast(@UF_VALOR*2 as varchar(20))
+				set @sqlfiltro = @sqlfiltro + ' and deuda_cotizaciones <= '+cast(@UF_VALOR*2 as varchar(20))
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%3%'		--3 Afiliados Vigentes GRUPO C (DEUDA > A UF 3)
 		BEGIN
-			IF @GRUPO_DEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @GRUPO_DEUDA = ' and deuda_cotizaciones > '+cast(@UF_VALOR*3 as varchar(20))
+				SET @sqlfiltro = ' and deuda_cotizaciones > '+cast(@UF_VALOR*3 as varchar(20))
 			END
 			ELSE
 			BEGIN
-				set @GRUPO_DEUDA = @GRUPO_DEUDA + ' and deuda_cotizaciones > '+cast(@UF_VALOR*3 as varchar(20))
+				set @sqlfiltro = @sqlfiltro + ' and deuda_cotizaciones > '+cast(@UF_VALOR*3 as varchar(20))
 			END
 		END
 
-		--set @sqlwhere = @sqlwhere + ' and TIPO_DEUDOR = '''+@NOMBRE_VALOR+''''
-		set @sqlwhere = @sqlwhere + @GRUPO_DEUDA
+		set @sqlwhere = @sqlwhere + @sqlfiltro
 	END
-
-
---	IF @CODIGO_CONCEPTO = 6 
---	BEGIN
---		--IF @NOMBRE_VALOR = 'A'
---		IF @NOMBRE_VALOR = '1'
---		BEGIN
---			set @sqlwhere = @sqlwhere + ' and deuda_cotizaciones <= '+cast(@UF_VALOR as varchar(20))
---		END
-
---		--IF @NOMBRE_VALOR = 'B'
---		IF @NOMBRE_VALOR = '2'
---		BEGIN
---			set @sqlwhere = @sqlwhere + ' and deuda_cotizaciones <= '+cast(@UF_VALOR*2 as varchar(20))
---		END
-
---		--IF @NOMBRE_VALOR = 'C'
---		IF @NOMBRE_VALOR = '3'
---		BEGIN
---			set @sqlwhere = @sqlwhere + ' and deuda_cotizaciones > '+cast(@UF_VALOR*3 as varchar(20))
---		END
---	END
-
-
-
-
 
 
 	--7	Tipo y Vigencia Deudor
 	--Vigente		1
 	--No Vigente	2
 	--Empresa		3
-	--select * from gco_envmsg_filtro where EPL_codigo = '1'
-	--select * from gco_envmsg_CONCEPTO where ECO_CODIGO  = 7
-	DECLARE @TIPO_DEUDOR_VIG VARCHAR(100)
-	SET @TIPO_DEUDOR_VIG = ''
 
 	IF @CODIGO_CONCEPTO = 7 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
 		BEGIN
-			IF @TIPO_DEUDOR_VIG = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @TIPO_DEUDOR_VIG = 'VIGENTE'
+				SET @sqlfiltro = 'VIGENTE'
 			END
 			ELSE
 			BEGIN
-				SET @TIPO_DEUDOR_VIG = @TIPO_DEUDOR_VIG+''','''+'VIGENTE'
+				SET @sqlfiltro = @sqlfiltro+''','''+'VIGENTE'
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%2%'
 		BEGIN
-			IF @TIPO_DEUDOR_VIG = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @TIPO_DEUDOR_VIG = 'NO VIGENTE'
+				SET @sqlfiltro = 'NO VIGENTE'
 			END
 			ELSE
 			BEGIN
-				SET @TIPO_DEUDOR_VIG = @TIPO_DEUDOR_VIG+''','''+'NO VIGENTE'
+				SET @sqlfiltro = @sqlfiltro+''','''+'NO VIGENTE'
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%3%'
 		BEGIN
-			IF @TIPO_DEUDOR_VIG = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @TIPO_DEUDOR_VIG = 'EMPRESA'
+				SET @sqlfiltro = 'EMPRESA'
 			END
 			ELSE
 			BEGIN
-				SET @TIPO_DEUDOR_VIG = @TIPO_DEUDOR_VIG+''','''+'EMPRESA'
+				SET @sqlfiltro = @sqlfiltro+''','''+'EMPRESA'
 			END
 		END
 
-		--set @sqlwhere = @sqlwhere + ' and TIPO_DEUDOR = '''+@NOMBRE_VALOR+''''
-		set @sqlwhere = @sqlwhere + ' and TIPO_DEUDOR IN ('''+@TIPO_DEUDOR_VIG+''')'
+		set @sqlwhere = @sqlwhere + ' and TIPO_DEUDOR IN ('''+@sqlfiltro+''')'
 	END
 		
 
@@ -306,183 +225,267 @@ BEGIN
 --1 Con 
 --2 Sin 
 
-	DECLARE @F_GESTION VARCHAR(100)
-	SET @F_GESTION = ''
-
 	IF @CODIGO_CONCEPTO = 8 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
 		BEGIN
-			IF @F_GESTION = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_GESTION = 'Si'
+				SET @sqlfiltro = 'Si'
 			END
 			ELSE
 			BEGIN
-				SET @F_GESTION = @F_GESTION+''','''+'Si'
+				SET @sqlfiltro = @sqlfiltro+''','''+'Si'
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%2%'
 		BEGIN
-			IF @F_GESTION = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_GESTION = 'No'
+				SET @sqlfiltro = 'No'
 			END
 			ELSE
 			BEGIN
-				SET @F_GESTION = @F_GESTION+''','''+'No'
+				SET @sqlfiltro = @sqlfiltro+''','''+'No'
 			END
 		END
 
-		set @sqlwhere = @sqlwhere + ' and gestion29 IN ('''+@F_GESTION+''')'
+		set @sqlwhere = @sqlwhere + ' and gestion29 IN ('''+@sqlfiltro+''')'
 	END
 
 --CONCEPTO = 9 Fecha Compromiso vencido
 --1.- Vencidos (Compromiso Hoy-1)
 --2.- No Vencidos (Compromiso >=Hoy)
 
-
-	DECLARE @F_COMPVENCIDO VARCHAR(300)
-	SET @F_COMPVENCIDO = ''
-
 	IF @CODIGO_CONCEPTO = 9 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
 		BEGIN
-			IF @F_COMPVENCIDO = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				--SET @F_COMPVENCIDO = ' and compromiso_vencido < '+cast@fecha_hoy
-				SET @F_COMPVENCIDO = ' and compromiso_vencido < convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
+				SET @sqlfiltro = ' and compromiso_vencido < convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
 			END
 			ELSE
 			BEGIN
-				SET @F_COMPVENCIDO = @F_COMPVENCIDO+' and compromiso_vencido < convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
+				SET @sqlfiltro = @sqlfiltro+' and compromiso_vencido < convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%2%'
 		BEGIN
-			IF @F_COMPVENCIDO = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_COMPVENCIDO = ' and compromiso_vencido >= convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
+				SET @sqlfiltro = ' and compromiso_vencido >= convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
 			END
 			ELSE
 			BEGIN
-				SET @F_COMPVENCIDO = @F_COMPVENCIDO+' and compromiso_vencido >= convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
+				SET @sqlfiltro = @sqlfiltro+' and compromiso_vencido >= convert(datetime, '''+CONVERT (varchar(30), @fecha_hoy , 121 ) +''', 121)'
 			END
 		END
 
-		set @sqlwhere = @sqlwhere + ' AND compromiso_vencido IS NOT NULL ' +@F_COMPVENCIDO
+		set @sqlwhere = @sqlwhere + ' AND compromiso_vencido IS NOT NULL ' +@sqlfiltro
 	END
 		
-
 
 --CONCEPTO 10 Tipo de Deuda
 --1 Cotizaciones
 --2 Ley de Urgencia
 --3 Cheques Protestados
---update gco_envmsg_concepto SET eco_tipo_seleccion = 'M'  where eco_codigo = 10
-
-
-	DECLARE @F_TIPODEUDA VARCHAR(300)
-	SET @F_TIPODEUDA = ''
 
 	IF @CODIGO_CONCEPTO = 10 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
 		BEGIN
-			IF @F_TIPODEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_TIPODEUDA = ' and deuda_cotizaciones > 0'
+				SET @sqlfiltro = ' and deuda_cotizaciones > 0'
 			END
 			ELSE
 			BEGIN
-				SET @F_TIPODEUDA = @F_TIPODEUDA+' and deuda_cotizaciones > 0'
+				SET @sqlfiltro = @sqlfiltro+' and deuda_cotizaciones > 0'
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%2%'
 		BEGIN
-			IF @F_TIPODEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_TIPODEUDA = ' and deuda_lur > 0'
+				SET @sqlfiltro = ' and deuda_lur > 0'
 			END
 			ELSE
 			BEGIN
-				SET @F_TIPODEUDA = @F_TIPODEUDA+' and deuda_lur > 0'
+				SET @sqlfiltro = @sqlfiltro+' and deuda_lur > 0'
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%3%'
 		BEGIN
-			IF @F_TIPODEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_TIPODEUDA = ' and deuda_chq > 0'
+				SET @sqlfiltro = ' and deuda_chq > 0'
 			END
 			ELSE
 			BEGIN
-				SET @F_TIPODEUDA = @F_TIPODEUDA+' and deuda_chq > 0'
+				SET @sqlfiltro = @sqlfiltro+' and deuda_chq > 0'
 			END
 		END
 
-		set @sqlwhere = @sqlwhere + @F_TIPODEUDA
+		set @sqlwhere = @sqlwhere + @sqlfiltro
 	END
 		
-
 
 --CONCEPTO 11 Tipo Deuda Cotizaciones
 --1 DNP
 --2 IP
 --3 DPP
 
-
-
-	SET @F_TIPODEUDA = ''
-
 	IF @CODIGO_CONCEPTO = 11 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
 		BEGIN
-			IF @F_TIPODEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_TIPODEUDA = ' and DNP > 0'
+				SET @sqlfiltro = ' and DNP > 0'
 			END
 			ELSE
 			BEGIN
-				SET @F_TIPODEUDA = @F_TIPODEUDA+' and DNP > 0'
+				SET @sqlfiltro = @sqlfiltro+' and DNP > 0'
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%2%'
 		BEGIN
-			IF @F_TIPODEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_TIPODEUDA = ' and IP > 0'
+				SET @sqlfiltro = ' and IP > 0'
 			END
 			ELSE
 			BEGIN
-				SET @F_TIPODEUDA = @F_TIPODEUDA+' and IP > 0'
+				SET @sqlfiltro = @sqlfiltro+' and IP > 0'
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%3%'
 		BEGIN
-			IF @F_TIPODEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_TIPODEUDA = ' and DPP > 0'
+				SET @sqlfiltro = ' and DPP > 0'
 			END
 			ELSE
 			BEGIN
-				SET @F_TIPODEUDA = @F_TIPODEUDA+' and DPP > 0'
+				SET @sqlfiltro = @sqlfiltro+' and DPP > 0'
 			END
 		END
 
-		set @sqlwhere = @sqlwhere + @F_TIPODEUDA
+		set @sqlwhere = @sqlwhere + @sqlfiltro
+	END
+
+
+--12	Menor Periodo de Deuda	M
+--1 Mes (Hoy - 180)
+--2 Mes (Hoy - 179)
+--3 Mes (Hoy - 178)
+--4 Etc…
+-- Marcelo: Menor periodo de deuda: hasta 6, hasta 5, hasta 4
+
+	IF @CODIGO_CONCEPTO = 12 
+	BEGIN
+
+		IF @NOMBRE_VALOR LIKE '%1%'
+		BEGIN
+			IF @sqlfiltro = ''
+			BEGIN
+				SET @sqlfiltro = ' and menor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -6, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+			ELSE
+			BEGIN
+				SET @sqlfiltro = @sqlfiltro+' and menor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -6, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @sqlfiltro = ''
+			BEGIN
+				SET @sqlfiltro = ' and menor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -5, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+			ELSE
+			BEGIN
+				SET @sqlfiltro = @sqlfiltro+' and menor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -5, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @sqlfiltro = ''
+			BEGIN
+				SET @sqlfiltro = ' and menor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -4, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+			ELSE
+			BEGIN
+				SET @sqlfiltro = @sqlfiltro+' and menor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -4, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+		END
+
+		set @sqlwhere = @sqlwhere + ' AND menor_per_deuda IS NOT NULL ' +@sqlfiltro
+	END
+
+
+
+
+
+--13	Mayor periodo de deuda
+--1 Mes (Hoy - 2)
+--2 Mes (Hoy - 3)
+--3 Mes (Hoy - 4)
+
+-- Marcelo: Mayor periodo de deuda: hasta 4, Hasta 3, Hasta 2
+
+	IF @CODIGO_CONCEPTO = 13
+	BEGIN
+
+		IF @NOMBRE_VALOR LIKE '%1%'
+		BEGIN
+			IF @sqlfiltro = ''
+			BEGIN
+				SET @sqlfiltro = ' and mayor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -4, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+			ELSE
+			BEGIN
+				SET @sqlfiltro = @sqlfiltro+' and mayor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -4, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @sqlfiltro = ''
+			BEGIN
+				SET @sqlfiltro = ' and mayor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -3, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+			ELSE
+			BEGIN
+				SET @sqlfiltro = @sqlfiltro+' and mayor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -3, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @sqlfiltro = ''
+			BEGIN
+				SET @sqlfiltro = ' and mayor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -2, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+			ELSE
+			BEGIN
+				SET @sqlfiltro = @sqlfiltro+' and mayor_per_deuda >= convert(datetime, '''+CONVERT (varchar(30), dateadd(month, -2, @PrimerDiaDelMes) , 121 ) +''', 121)'
+			END
+		END
+
+		set @sqlwhere = @sqlwhere + ' AND mayor_per_deuda IS NOT NULL ' +@sqlfiltro
 	END
 
 
@@ -491,14 +494,88 @@ BEGIN
 
 --	--CONCEPTO 14 CIUDAD DE RESIDENCIA
 
-	SET @F_COBRADOR = ''
-
 	IF @CODIGO_CONCEPTO = 14 
 	BEGIN
-		SET @F_COBRADOR = replace(@NOMBRE_VALOR, '|', ',')
+		SET @sqlfiltro = replace(@NOMBRE_VALOR, '|', ',')
 
-		set @sqlwhere = @sqlwhere + ' and CIU_CODIGO_RESIDE in ('+@F_COBRADOR+')'
+		set @sqlwhere = @sqlwhere + ' and CIU_CODIGO_RESIDE in ('+@sqlfiltro+')'
 
+	END
+
+
+
+--15	Deudores LUR con Crédito 5%
+--1 SI
+--2 NO
+
+
+	IF @CODIGO_CONCEPTO = 15 
+	BEGIN
+
+		IF @NOMBRE_VALOR LIKE '%1%'
+		BEGIN
+			IF @sqlfiltro = ''
+			BEGIN
+				SET @sqlfiltro = 'Si'
+			END
+			ELSE
+			BEGIN
+				SET @sqlfiltro = @sqlfiltro+''','''+'Si'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @sqlfiltro = ''
+			BEGIN
+				SET @sqlfiltro = 'No'
+			END
+			ELSE
+			BEGIN
+				SET @sqlfiltro = @sqlfiltro+''','''+'No'
+			END
+		END
+
+		set @sqlwhere = @sqlwhere + ' and deuda_lur_con_credito IN ('''+@sqlfiltro+''')'
+	END
+
+
+
+
+--CONCEPTO 18 Posible Compensar x TFU	Si cuenta con saldo disponible de devolución TFU
+--1 SI	
+--2 NO	
+
+
+	IF @CODIGO_CONCEPTO = 18 
+	BEGIN
+
+		IF @NOMBRE_VALOR LIKE '%1%'
+		BEGIN
+			IF @sqlfiltro = ''
+			BEGIN
+				SET @sqlfiltro = ' and monto_posible_compensar > 0'
+			END
+			ELSE
+			BEGIN
+				SET @sqlfiltro = @sqlfiltro+' and monto_posible_compensar > 0'
+			END
+		END
+
+		IF @NOMBRE_VALOR LIKE '%2%'
+		BEGIN
+			IF @sqlfiltro = ''
+			BEGIN
+				SET @sqlfiltro = ' and monto_posible_compensar <= 0'
+			END
+			ELSE
+			BEGIN
+				SET @sqlfiltro = @sqlfiltro+' and monto_posible_compensar  <= 0'
+			END
+		END
+
+
+		set @sqlwhere = @sqlwhere + @sqlfiltro
 	END
 
 
@@ -510,69 +587,59 @@ BEGIN
 --3 41 - 55
 --4 Otros
 
-	SET @F_TIPODEUDA = ''
-
 	IF @CODIGO_CONCEPTO = 19 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
 		BEGIN
-			IF @F_TIPODEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_TIPODEUDA = ' and EDAD_DEUDOR >= 18 and EDAD_DEUDOR <= 25 '
+				SET @sqlfiltro = ' and EDAD_DEUDOR >= 18 and EDAD_DEUDOR <= 25 '
 			END
 			ELSE
 			BEGIN
-				SET @F_TIPODEUDA = @F_TIPODEUDA+' and EDAD_DEUDOR >= 18 and EDAD_DEUDOR <= 25 '
+				SET @sqlfiltro = @sqlfiltro+' and EDAD_DEUDOR >= 18 and EDAD_DEUDOR <= 25 '
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%2%'
 		BEGIN
-			IF @F_TIPODEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_TIPODEUDA = ' and EDAD_DEUDOR >= 26 and EDAD_DEUDOR <= 40 '
+				SET @sqlfiltro = ' and EDAD_DEUDOR >= 26 and EDAD_DEUDOR <= 40 '
 			END
 			ELSE
 			BEGIN
-				SET @F_TIPODEUDA = @F_TIPODEUDA+' and EDAD_DEUDOR >= 26 and EDAD_DEUDOR <= 40 '
+				SET @sqlfiltro = @sqlfiltro+' and EDAD_DEUDOR >= 26 and EDAD_DEUDOR <= 40 '
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%3%'
 		BEGIN
-			IF @F_TIPODEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_TIPODEUDA = ' and EDAD_DEUDOR >= 41 and EDAD_DEUDOR <= 55 '
+				SET @sqlfiltro = ' and EDAD_DEUDOR >= 41 and EDAD_DEUDOR <= 55 '
 			END
 			ELSE
 			BEGIN
-				SET @F_TIPODEUDA = @F_TIPODEUDA+' and EDAD_DEUDOR >= 41 and EDAD_DEUDOR <= 55 '
+				SET @sqlfiltro = @sqlfiltro+' and EDAD_DEUDOR >= 41 and EDAD_DEUDOR <= 55 '
 			END
 		END
 
 		IF @NOMBRE_VALOR LIKE '%4%'
 		BEGIN
-			IF @F_TIPODEUDA = ''
+			IF @sqlfiltro = ''
 			BEGIN
-				SET @F_TIPODEUDA = ' and EDAD_DEUDOR < 18 and EDAD_DEUDOR > 55 '
+				SET @sqlfiltro = ' and EDAD_DEUDOR < 18 and EDAD_DEUDOR > 55 '
 			END
 			ELSE
 			BEGIN
-				SET @F_TIPODEUDA = @F_TIPODEUDA+' and EDAD_DEUDOR < 18 and EDAD_DEUDOR > 55 '
+				SET @sqlfiltro = @sqlfiltro+' and EDAD_DEUDOR < 18 and EDAD_DEUDOR > 55 '
 			END
 		END
 
-		set @sqlwhere = @sqlwhere + @F_TIPODEUDA
+		set @sqlwhere = @sqlwhere + @sqlfiltro
 	END
-
-
-
-
-
-
-
-
 
 	FETCH NEXT FROM CUR_FILTROS INTO @CODIGO_CONCEPTO, @NOMBRE_VALOR
 
@@ -580,8 +647,6 @@ END
 
 CLOSE CUR_FILTROS
 DEALLOCATE CUR_FILTROS
-
-
 
 
 --REGLA SI NO HAY FILTROS, NO TRAER NADA
@@ -594,8 +659,6 @@ PRINT '_'+@sqlwhere+'_'
 
 --return
 --0.- PLANILLA_____________________________
-
-
 
 
 	
@@ -882,11 +945,11 @@ create nonclustered index ix_f_vigencia_personas_rut on #f_vigencia_personas(rut
 
 --11.- FILTRO Gestion 29	SELECT * FROM GESTION_COBRANZA WHERE TGC_CODIGO=29 (en el mes en curso)
 
-declare @PrimerDiaDelMes datetime
-declare @PrimerDiaDelMesSgte datetime
+--declare @PrimerDiaDelMes datetime
+--declare @PrimerDiaDelMesSgte datetime
 
-SELECT @PrimerDiaDelMes = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) AS DATE) 
-SELECT @PrimerDiaDelMesSgte = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()) + 1, 0) AS DATE) 
+--SELECT @PrimerDiaDelMes = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) AS DATE) 
+--SELECT @PrimerDiaDelMesSgte = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()) + 1, 0) AS DATE) 
 
 	--select @PrimerDiaDelMes, @PrimerDiaDelMesSgte
 
