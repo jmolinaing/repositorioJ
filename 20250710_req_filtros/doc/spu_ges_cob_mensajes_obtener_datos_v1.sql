@@ -6,10 +6,10 @@
  fecha creación		:	09-2025                                                    
  descripción		:	Lista de deudores a partir de plantillas con filtros asociados.																	
 ========================================================================================*/
-/*	execute spu_ges_cob_mensajes_obtener_datos 1
+/*	execute spu_ges_cob_mensajes_obtener_datos '8'
 */
 
-create procedure [dbo].[spu_ges_cob_mensajes_obtener_datos] 
+alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos] 
 @epl_codigo varchar(50) = null
 as
 BEGIN	
@@ -23,34 +23,33 @@ declare @uf_valor numeric(8, 2)
 declare @fecha_hoy datetime
 declare @PrimerDiaDelMes datetime
 declare @PrimerDiaDelMesSgte datetime
-
-SELECT @PrimerDiaDelMes = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) AS DATE) 
-SELECT @PrimerDiaDelMesSgte = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()) + 1, 0) AS DATE) 
-
-
-if object_id('tempdb..#filtros', 'u') is not null drop table #filtros
-
-if not exists (select 1 from gco_envmsg_plantilla with (nolock) where epl_codigo = @epl_codigo)
-begin
-	select 'no existe plantilla'
-	return 
-end
-
-if not exists (select 1 from gco_envmsg_filtro with (nolock) where epl_codigo = @epl_codigo)
-begin
-	select 'no existe filtros en la plantilla'
-	return 
-end
+declare @UltDiaMesAnterior datetime
 
 set @fecha_hoy = cast( ( cast(getdate() as date)) as datetime)
+SELECT @PrimerDiaDelMes = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) AS DATE) 
+SELECT @PrimerDiaDelMesSgte = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()) + 1, 0) AS DATE) 
+set @UltDiaMesAnterior = dateadd(day, -1, @PrimerDiaDelMes)
 
-select @uf_valor = uf_valor from uf with (nolock) where uf_fecha = @fecha_hoy
 
-if @uf_valor is null
-begin
-	select 'no existe uf'
-	return 
-end
+--if not exists (select 1 from gco_envmsg_plantilla with (nolock) where epl_codigo = @epl_codigo)
+--begin
+--	select 'no existe plantilla'
+--	return 
+--end
+
+--if not exists (select 1 from gco_envmsg_filtro with (nolock) where epl_codigo = @epl_codigo)
+--begin
+--	select 'no existe filtros en la plantilla'
+--	return 
+--end
+
+--select @uf_valor = uf_valor from uf with (nolock) where uf_fecha = @UltDiaMesAnterior
+
+--if @uf_valor is null
+--begin
+--	select 'no existe uf'
+--	return 
+--end
 
 
 
@@ -58,8 +57,7 @@ end
 --/*
 ---- SELECT * FROM GCO_ENVMSG_CONCEPTO
 --ECO_CODIGO numeric(5) not null	ECO_NOMBRE varchar(200) not null	ECO_TIPO_SELECCION
---1	TIPO ENVIO	S
---2	LINK	S
+
 --3	GRUPO o Equipo	S
 --4	Supervisor	S
 --5	Cobrador Asignado	M
@@ -99,38 +97,39 @@ FETCH NEXT FROM CUR_FILTROS INTO @CODIGO_CONCEPTO, @NOMBRE_VALOR
 WHILE @@FETCH_STATUS = 0
 BEGIN
 
---CONCEPTO 3: GRUPO o Equipo
+--CONCEPTO 1: GRUPO o Equipo
 	--Equipo Interno
 	--Equipo Stock
 	--Equipo judicial
 
 
---CONCEPTO 4:	Supervisor	S
+--CONCEPTO 2:	Supervisor	S
 	--A.SOTO
 	--E.CABELLO
 	--C.MORALES
 
 	set @sqlfiltro = ''
 
-	IF @CODIGO_CONCEPTO = 4 
+	IF @CODIGO_CONCEPTO = 2 
 	BEGIN
 		SET @sqlfiltro = replace(@NOMBRE_VALOR, '|', ',')
 		set @sqlwhere = @sqlwhere + ' and supervisor_asig in ('+@sqlfiltro+')'
 	END
 
-	IF @CODIGO_CONCEPTO = 5 
+--CONCEPTO 3: cobrador asignado
+	IF @CODIGO_CONCEPTO = 3 
 	BEGIN
 		SET @sqlfiltro = replace(@NOMBRE_VALOR, '|', ',')
 		set @sqlwhere = @sqlwhere + ' and COB_CODIGO in ('+@sqlfiltro+')'
 	END
 
---	--CONCEPTO 6 Grupo Deuda: VALORES A, B, C
+--	--CONCEPTO 4 Grupo Deuda: VALORES A, B, C
 --	--1 Afiliados Vigentes GRUPO A (DEUDA <= A UF 1)	
 --	--2 Afiliados Vigentes GRUPO B (DEUDA <= A UF 2)	
 --	--3 Afiliados Vigentes GRUPO C (DEUDA > A UF 3)
 --	--select * from gco_envmsg_filtro where EPL_codigo = '1'
 
-	IF @CODIGO_CONCEPTO = 6 
+	IF @CODIGO_CONCEPTO = 4 
 	BEGIN
 		IF @NOMBRE_VALOR LIKE '%1%'	-- Afiliados Vigentes GRUPO A (DEUDA <= A UF 1)	
 		BEGIN
@@ -172,12 +171,12 @@ BEGIN
 	END
 
 
-	--7	Tipo y Vigencia Deudor
+	--5	Tipo y Vigencia Deudor
 	--Vigente		1
 	--No Vigente	2
 	--Empresa		3
 
-	IF @CODIGO_CONCEPTO = 7 
+	IF @CODIGO_CONCEPTO = 5 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
@@ -220,11 +219,11 @@ BEGIN
 	END
 		
 
---8	Con Gestión Cód.. 29	M
+--6	Con Gestión Cód.. 29	M
 --1 Con 
 --2 Sin 
 
-	IF @CODIGO_CONCEPTO = 8 
+	IF @CODIGO_CONCEPTO = 6 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
@@ -254,11 +253,11 @@ BEGIN
 		set @sqlwhere = @sqlwhere + ' and gestion29 IN ('''+@sqlfiltro+''')'
 	END
 
---CONCEPTO = 9 Fecha Compromiso vencido
+--CONCEPTO = 7 Fecha Compromiso vencido
 --1.- Vencidos (Compromiso Hoy-1)
 --2.- No Vencidos (Compromiso >=Hoy)
 
-	IF @CODIGO_CONCEPTO = 9 
+	IF @CODIGO_CONCEPTO = 7 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
@@ -289,12 +288,12 @@ BEGIN
 	END
 		
 
---CONCEPTO 10 Tipo de Deuda
+--CONCEPTO 8 Tipo de Deuda
 --1 Cotizaciones
 --2 Ley de Urgencia
 --3 Cheques Protestados
 
-	IF @CODIGO_CONCEPTO = 10 
+	IF @CODIGO_CONCEPTO = 8 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
@@ -337,12 +336,12 @@ BEGIN
 	END
 		
 
---CONCEPTO 11 Tipo Deuda Cotizaciones
+--CONCEPTO 9 Tipo Deuda Cotizaciones
 --1 DNP
 --2 IP
 --3 DPP
 
-	IF @CODIGO_CONCEPTO = 11 
+	IF @CODIGO_CONCEPTO = 9
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
@@ -385,14 +384,14 @@ BEGIN
 	END
 
 
---12	Menor Periodo de Deuda	M
+--CONCEPTO 10:	Menor Periodo de Deuda	M
 --1 Mes (Hoy - 180)
 --2 Mes (Hoy - 179)
 --3 Mes (Hoy - 178)
 --4 Etc…
 -- Marcelo: Menor periodo de deuda: hasta 6, hasta 5, hasta 4
 
-	IF @CODIGO_CONCEPTO = 12 
+	IF @CODIGO_CONCEPTO = 10 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
@@ -435,17 +434,13 @@ BEGIN
 	END
 
 
-
-
-
---13	Mayor periodo de deuda
+--CONCEPTO 11: Mayor periodo de deuda
 --1 Mes (Hoy - 2)
 --2 Mes (Hoy - 3)
 --3 Mes (Hoy - 4)
-
 -- Marcelo: Mayor periodo de deuda: hasta 4, Hasta 3, Hasta 2
 
-	IF @CODIGO_CONCEPTO = 13
+	IF @CODIGO_CONCEPTO = 11
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
@@ -488,12 +483,9 @@ BEGIN
 	END
 
 
+	--CONCEPTO 12: CIUDAD DE RESIDENCIA
 
-
-
---	--CONCEPTO 14 CIUDAD DE RESIDENCIA
-
-	IF @CODIGO_CONCEPTO = 14 
+	IF @CODIGO_CONCEPTO = 12 
 	BEGIN
 		SET @sqlfiltro = replace(@NOMBRE_VALOR, '|', ',')
 
@@ -502,13 +494,11 @@ BEGIN
 	END
 
 
-
---15	Deudores LUR con Crédito 5%
+	--CONCEPTO 13: Deudores LUR con Crédito 5%
 --1 SI
 --2 NO
 
-
-	IF @CODIGO_CONCEPTO = 15 
+	IF @CODIGO_CONCEPTO = 13 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
@@ -539,14 +529,11 @@ BEGIN
 	END
 
 
-
-
---CONCEPTO 18 Posible Compensar x TFU	Si cuenta con saldo disponible de devolución TFU
+--CONCEPTO 16: Posible Compensar x TFU	Si cuenta con saldo disponible de devolución TFU
 --1 SI	
 --2 NO	
 
-
-	IF @CODIGO_CONCEPTO = 18 
+	IF @CODIGO_CONCEPTO = 16 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
@@ -578,15 +565,13 @@ BEGIN
 	END
 
 
-
-
---CONCEPTO 19 EDAD DEUDOR
+--CONCEPTO 17 EDAD DEUDOR
 --1 18-25
 --2 26-40
 --3 41 - 55
 --4 Otros
 
-	IF @CODIGO_CONCEPTO = 19 
+	IF @CODIGO_CONCEPTO = 17 
 	BEGIN
 
 		IF @NOMBRE_VALOR LIKE '%1%'
