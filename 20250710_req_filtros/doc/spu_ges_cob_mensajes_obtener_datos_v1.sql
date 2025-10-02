@@ -7,6 +7,8 @@
  descripción		:	Lista de deudores a partir de plantillas con filtros asociados.																	
 ========================================================================================*/
 /*	execute spu_ges_cob_mensajes_obtener_datos '8'
+
+GRANT EXECUTE ON [spu_ges_cob_mensajes_obtener_datos] TO public;
 */
 
 alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos] 
@@ -31,25 +33,25 @@ SELECT @PrimerDiaDelMesSgte = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()) 
 set @UltDiaMesAnterior = dateadd(day, -1, @PrimerDiaDelMes)
 
 
---if not exists (select 1 from gco_envmsg_plantilla with (nolock) where epl_codigo = @epl_codigo)
---begin
---	select 'no existe plantilla'
---	return 
---end
+if not exists (select 1 from gco_envmsg_plantilla with (nolock) where epl_codigo = @epl_codigo)
+begin
+	select 'no existe plantilla'
+	return 
+end
 
---if not exists (select 1 from gco_envmsg_filtro with (nolock) where epl_codigo = @epl_codigo)
---begin
---	select 'no existe filtros en la plantilla'
---	return 
---end
+if not exists (select 1 from gco_envmsg_filtro with (nolock) where epl_codigo = @epl_codigo)
+begin
+	select 'no existe filtros en la plantilla'
+	return 
+end
 
---select @uf_valor = uf_valor from uf with (nolock) where uf_fecha = @UltDiaMesAnterior
+select @uf_valor = uf_valor from uf with (nolock) where uf_fecha = @UltDiaMesAnterior
 
---if @uf_valor is null
---begin
---	select 'no existe uf'
---	return 
---end
+if @uf_valor is null
+begin
+	select 'no existe uf'
+	return 
+end
 
 
 

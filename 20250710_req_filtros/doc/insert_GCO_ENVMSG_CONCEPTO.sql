@@ -1,6 +1,6 @@
 select * from GCO_ENVMSG_PLANTILLA
 select * from GCO_ENVMSG_CONCEPTO
-
+select * from GCO_ENVMSG_FILTRO
 
 delete GCO_ENVMSG_FILTRO
 delete GCO_ENVMSG_CONCEPTO
@@ -26,3 +26,5 @@ insert into GCO_ENVMSG_CONCEPTO values (14, 'Tipo de Empresa', 'M')
 insert into GCO_ENVMSG_CONCEPTO values (15, 'Rubro Empresa', 'M')
 insert into GCO_ENVMSG_CONCEPTO values (16, 'Posible Compensar x TFU', 'M')
 insert into GCO_ENVMSG_CONCEPTO values (17, 'Edad Deudor', 'M')
+
+
