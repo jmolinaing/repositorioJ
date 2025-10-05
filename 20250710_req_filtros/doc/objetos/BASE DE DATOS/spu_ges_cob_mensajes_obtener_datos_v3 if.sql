@@ -6,16 +6,21 @@
  fecha creación		:	09-2025                                                    
  descripción		:	Lista de deudores a partir de plantillas con filtros asociados.																	
 ========================================================================================*/
-/*	execute spu_ges_cob_mensajes_obtener_datos '8'
+/*	execute spu_ges_cob_mensajes_obtener_datos_v3 8
 
-GRANT EXECUTE ON [spu_ges_cob_mensajes_obtener_datos] TO public;
+GRANT EXECUTE ON [spu_ges_cob_mensajes_obtener_datos_v3] TO public;
 */
 
-alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos] 
+CREATE procedure [dbo].[spu_ges_cob_mensajes_obtener_datos_v3] 
 @epl_codigo varchar(50) = null
+, @enviar char(1) = 'N'
 as
 BEGIN	
 	set nocount on;
+
+--declare @epl_codigo varchar(50) = '1'
+--, @enviar char(1) = 'N'
+
 
 declare @sqlwhere nvarchar(4000)
 declare @sqlfiltro nvarchar(1000)
@@ -26,6 +31,9 @@ declare @fecha_hoy datetime
 declare @PrimerDiaDelMes datetime
 declare @PrimerDiaDelMesSgte datetime
 declare @UltDiaMesAnterior datetime
+declare @TipoDeudaCOTIZ varchar(2)
+declare @TipoDeudaLUR varchar(2)
+declare @TipoDeudaCHQ varchar(2)
 
 set @fecha_hoy = cast( ( cast(getdate() as date)) as datetime)
 SELECT @PrimerDiaDelMes = CAST(DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) AS DATE) 
@@ -54,34 +62,11 @@ begin
 end
 
 
-
-
---/*
----- SELECT * FROM GCO_ENVMSG_CONCEPTO
---ECO_CODIGO numeric(5) not null	ECO_NOMBRE varchar(200) not null	ECO_TIPO_SELECCION
-
---3	GRUPO o Equipo	S
---4	Supervisor	S
---5	Cobrador Asignado	M
---6	Grupo Deuda	M
---7	Tipo y Vigencia Deudor	M
---8	Con Gestión Cód.. 29	M
---9	Fecha Compromiso vencido	M
---10	Tipo de Deuda	S
---11	Tipo Deuda Cotizaciones	M
---12	Menor Periodo de Deuda	M
---13	Mayor Periodo de Deuda	M
---14	Cuidad Residencia	M
---15	Deudores LUR con Crédito 5%	M
---16	Tipo de Empresa	M
---17	Rubro Empresa	M
---18	Posible Compensar x TFU	M
---19	Edad Deudor	M
---*/
-
-
 set @sqlwhere = ''
 set @sqlfiltro = ''
+set @TipoDeudaCOTIZ = ''
+set @TipoDeudaLUR = ''
+set @TipoDeudaCHQ = ''
 
 --CURSOR
 DECLARE CUR_FILTROS CURSOR FOR
@@ -308,6 +293,9 @@ BEGIN
 			BEGIN
 				SET @sqlfiltro = @sqlfiltro+' and deuda_cotizaciones > 0'
 			END
+
+			set @TipoDeudaCOTIZ = 'SI'
+
 		END
 
 		IF @NOMBRE_VALOR LIKE '%2%'
@@ -320,6 +308,9 @@ BEGIN
 			BEGIN
 				SET @sqlfiltro = @sqlfiltro+' and deuda_lur > 0'
 			END
+
+			set @TipoDeudaLUR = 'SI'
+
 		END
 
 		IF @NOMBRE_VALOR LIKE '%3%'
@@ -332,6 +323,8 @@ BEGIN
 			BEGIN
 				SET @sqlfiltro = @sqlfiltro+' and deuda_chq > 0'
 			END
+
+			set @TipoDeudaCHQ = 'SI'
 		END
 
 		set @sqlwhere = @sqlwhere + @sqlfiltro
@@ -635,13 +628,20 @@ CLOSE CUR_FILTROS
 DEALLOCATE CUR_FILTROS
 
 
+PRINT 'WHERE:_'+@sqlwhere+'_'
+
+PRINT 'WHERE:_'+@TipoDeudaCOTIZ+'_'
+PRINT 'WHERE:_'+@TipoDeudaLUR+'_'
+PRINT 'WHERE:_'+@TipoDeudaCHQ+'_'
+
 --REGLA SI NO HAY FILTROS, NO TRAER NADA
 IF isnull(@sqlwhere, '') = '' 
 BEGIN
 	SET @sqlwhere = 'AND 1 = 2'
-END
 
-PRINT '_'+@sqlwhere+'_'
+	select 'NO EXISTE WHERE'
+	RETURN 
+END
 
 --return
 --0.- PLANILLA_____________________________
@@ -655,7 +655,7 @@ PRINT '_'+@sqlwhere+'_'
 	if object_id('tempdb..#tabla_final', 'u') is not null drop table #tabla_final
 	if object_id('tempdb..#tfu', 'u') is not null drop table #tfu
 	if object_id('tempdb..#compromiso', 'u') is not null drop table #compromiso
-	if object_id('tempdb..#cobrador_asig', 'u') is not null drop table #cobrador_asig
+	if object_id('tempdb..#cobrador_lur_chq', 'u') is not null drop table #cobrador_lur_chq
 	if object_id('tempdb..#f_supervisor_asig', 'u') is not null drop table #f_supervisor_asig 
 	if object_id('tempdb..#f_vigencia_personas', 'u') is not null drop table #f_vigencia_personas
 	if object_id('tempdb..#f_gestion29', 'u') is not null drop table #f_gestion29
@@ -686,7 +686,10 @@ PRINT '_'+@sqlwhere+'_'
 		, deuda_lur numeric(15) null
 		, deuda_chq numeric(15) null
 		, cobrador_asignado_lur_chq numeric(10) null
-		, fono_contacto varchar(30) null
+		, nom_cob_lurchq varchar(100) null
+		, email_cob_lurchq varchar(100) null
+		, fono_cob_lurchq varchar(30) null
+		, fono_contacto varchar(50) null
 		, supervisor_asig numeric(4) null	--*
 		, gestion29 varchar(2) null
 		, ciu_codigo_reside numeric(4) null 
@@ -703,50 +706,78 @@ PRINT '_'+@sqlwhere+'_'
 		--, primary key (rut_deudor)
 	)
 
+create table #DEUDA_COTIZ_EMPL
+(
+COT_RUT char(10) not null
+, DEC_PERIODO datetime null
+, DEUDA_EMPLEADOR numeric(15) null
+)
+
+--SP_HELP DEUDA_COTIZANTE
+create table #TMP_DEUDA_COTIZANTE
+(
+DEC_RUT char(10) not null
+, DEC_PERIODO datetime null
+, DEC_TIPO_DEUDA varCHAR(20)
+, tipo_empresa varCHAR(20)
+, DEC_TIPO_COTIZANTE CHAR(10)
+, DEC_DEUDA numeric(15) null
+, DEUDA_REAJUSTADA numeric(15) null
+)
+
+--En cambio, el filtro en el WHERE se evalúa para cada fila y la consulta siempre se ejecuta (aunque filtre posteriormente), lo que puede generar trabajo innecesario si la consulta es pesada y la condición sencilla como esta.
+
 
 --1.- Obtiene la deuda de cada COTIZANTE cuya responsabilidad de pago es de algún empleador
+IF @TipoDeudaCOTIZ = 'SI'
+BEGIN 
 
-SELECT  COT_RUT, 
-	DEC_PERIODO,
-	SUM(CASE WHEN EPA_RUT IS NOT NULL THEN DEC_PACTADO - DEC_PAGADO END) AS DEUDA_EMPLEADOR
-INTO #DEUDA_COTIZ_EMPL
-FROM DEUDA_COTIZANTE with (nolock)
-WHERE EPA_RUT IS NOT NULL
-GROUP BY  COT_RUT, DEC_PERIODO
+		--1.- Obtiene la deuda de cada COTIZANTE cuya responsabilidad de pago es de algún empleador
+		INSERT #DEUDA_COTIZ_EMPL (COT_RUT, DEC_PERIODO, DEUDA_EMPLEADOR)
+		SELECT  COT_RUT, 
+			DEC_PERIODO,
+			SUM(CASE WHEN EPA_RUT IS NOT NULL THEN DEC_PACTADO - DEC_PAGADO END) AS DEUDA_EMPLEADOR
+		--INTO #DEUDA_COTIZ_EMPL
+		FROM DEUDA_COTIZANTE with (nolock)
+		WHERE EPA_RUT IS NOT NULL
+		--AND @TipoDeudaCOTIZ = 'SI'
+		GROUP BY  COT_RUT, DEC_PERIODO
 
-CREATE INDEX IDX_1 ON #deuda_cotiz_empl(COT_RUT,DEC_PERIODO)
--- select * FROM #DEUDA_COTIZ_EMPL		--343.790 reg en 9 seg
+		CREATE INDEX IDX_1 ON #deuda_cotiz_empl(COT_RUT,DEC_PERIODO)
+		-- select * FROM #DEUDA_COTIZ_EMPL		--343.790 reg en 9 seg
 
 
---2.-Obtiene los registros de deudores desde DEUDA_COTIZANTE, pero restando a los registros de cotizantes (EPA_RUT IS NULL) el monto de la deuda cuya responsabilidad es de algún empleador
---y filtramos sólo aquellos registros que quedan con deuda > 0
+		--2.-Obtiene los registros de deudores desde DEUDA_COTIZANTE, pero restando a los registros de cotizantes (EPA_RUT IS NULL) el monto de la deuda cuya responsabilidad es de algún empleador
+		--y filtramos sólo aquellos registros que quedan con deuda > 0
+		insert into #TMP_DEUDA_COTIZANTE
+		SELECT 
+			DC.DEC_RUT,
+			DC.DEC_PERIODO,
+			CASE
+				WHEN DC.DEC_TIPO_DEUDA = 'DNP' THEN 'DNP'
+					WHEN DC.DEC_TIPO_DEUDA = 'NP' AND DC.DEC_PAGADO=0 THEN 'IP'
+				ELSE 'DPP'	 
+			END AS DEC_TIPO_DEUDA,
+			CASE WHEN EPA_RUT  IS NOT NULL THEN 'EMPRESA' ELSE 'COTIZANTE' END AS tipo_empresa ,		--TIPO_DEUDOR se cambia a tipo_empresa
+			DEC_TIPO_COTIZANTE,
+			(coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) as DEC_DEUDA,
+			(coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) + 
+				ROUND((CASE WHEN (INTERESES.INT_REAJUSTE < 0) OR (INTERESES.INT_REAJUSTE IS NULL) THEN 0 ELSE INTERESES.INT_REAJUSTE END) / 100 * ((coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0)), 0) +
+				ROUND((CASE WHEN (INTERESES.INT_INTERES  < 0) OR (INTERESES.INT_INTERES IS NULL ) THEN 0 ELSE INTERESES.INT_INTERES  END) / 100 * ((coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0)), 0) +
+				ROUND((CASE WHEN (INTERESES.INT_RECARGO < 0)  OR (INTERESES.INT_RECARGO IS NULL)  THEN 0 ELSE INTERESES.INT_RECARGO END)  / 100 * ((coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0)), 0) 
+			AS DEUDA_REAJUSTADA
+		--INTO #TMP_DEUDA_COTIZANTE
+		FROM DEUDA_COTIZANTE DC with (nolock)
+			LEFT JOIN #deuda_cotiz_empl D 
+				ON DC.COT_RUT=D.COT_RUT AND DC.DEC_PERIODO=D.DEC_PERIODO AND DC.EPA_RUT IS NULL
+			LEFT JOIN INTERESES (NOLOCK) ON INTERESES.INT_PPC_PERIODO = DC.DEC_PERIODO AND INTERESES.INT_FECHA_PAGO = CONVERT(CHAR(8), GETDATE(),112)
+		WHERE (coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) >0
+		--AND @TipoDeudaCOTIZ = 'SI'
 
-SELECT 
-	DC.DEC_RUT,
-	DC.DEC_PERIODO,
-	CASE
-		WHEN DC.DEC_TIPO_DEUDA = 'DNP' THEN 'DNP'
-			WHEN DC.DEC_TIPO_DEUDA = 'NP' AND DC.DEC_PAGADO=0 THEN 'IP'
-		ELSE 'DPP'	 
-	END AS DEC_TIPO_DEUDA,
-	CASE WHEN EPA_RUT  IS NOT NULL THEN 'EMPRESA' ELSE 'COTIZANTE' END AS tipo_empresa ,		--TIPO_DEUDOR se cambia a tipo_empresa
-	DEC_TIPO_COTIZANTE,
-	(coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) as DEC_DEUDA,
-	(coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) + 
-		ROUND((CASE WHEN (INTERESES.INT_REAJUSTE < 0) OR (INTERESES.INT_REAJUSTE IS NULL) THEN 0 ELSE INTERESES.INT_REAJUSTE END) / 100 * ((coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0)), 0) +
-		ROUND((CASE WHEN (INTERESES.INT_INTERES  < 0) OR (INTERESES.INT_INTERES IS NULL ) THEN 0 ELSE INTERESES.INT_INTERES  END) / 100 * ((coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0)), 0) +
-		ROUND((CASE WHEN (INTERESES.INT_RECARGO < 0)  OR (INTERESES.INT_RECARGO IS NULL)  THEN 0 ELSE INTERESES.INT_RECARGO END)  / 100 * ((coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0)), 0) 
-	AS DEUDA_REAJUSTADA
-INTO #TMP_DEUDA_COTIZANTE
-FROM DEUDA_COTIZANTE DC with (nolock)
-	LEFT JOIN #deuda_cotiz_empl D 
-		ON DC.COT_RUT=D.COT_RUT AND DC.DEC_PERIODO=D.DEC_PERIODO AND DC.EPA_RUT IS NULL
-	LEFT JOIN INTERESES (NOLOCK) ON INTERESES.INT_PPC_PERIODO = DC.DEC_PERIODO AND INTERESES.INT_FECHA_PAGO = CONVERT(CHAR(8), GETDATE(),112)
-WHERE (coalesce(DEC_PACTADO,0) - coalesce(DEC_PAGADO,0)) - coalesce(deuda_empleador,0) >0
-
-CREATE INDEX ix_TMP_DEUDA_COTIZANTE ON #TMP_DEUDA_COTIZANTE(DEC_RUT)
---select * from #TMP_DEUDA_COTIZANTE ORDER BY 1		--1.555.725 reg en 3min
---SELECT * FROM #TMP_DEUDA_COTIZANTE WHERE DEC_RUT = '  85213016'
+		CREATE INDEX ix_TMP_DEUDA_COTIZANTE ON #TMP_DEUDA_COTIZANTE(DEC_RUT)
+		--select * from #TMP_DEUDA_COTIZANTE ORDER BY 1		--1.555.725 reg en 3min
+		--SELECT * FROM #TMP_DEUDA_COTIZANTE WHERE DEC_RUT = '  85213016'
+END 
 
 
 --3.- --1.-TABLA_ORIGEN1: solo debe haber un rut por registro , se guardara en #origen_cotiz_empl
@@ -769,16 +800,49 @@ create nonclustered index ix_origen_cotiz_empl_rut on #origen_cotiz_empl (rut)
 
 
 --4.- TABLA_ORIGEN2: RUTS DE LUR Y CHQ (GCDF_DEUDA)
+--PRINT 'WHERE:_'+@TipoDeudaLUR+'_'
+--PRINT 'WHERE:_'+@TipoDeudaCHQ+'_'
 
-select
-  DDR_rut as rut,
-  sum(case when TDE_CODIGO = 1 then deu_monto else 0 end) as deuda_lur,
-  sum(case when TDE_CODIGO = 2 then deu_monto else 0 end) as deuda_chq
-INTO #origen_lur_chq
-from dbo.GCDF_DEUDA gd with (nolock)
-where deu_monto > 0
-and TDE_CODIGO in (1, 2)
-group by DDR_rut
+--v1
+--select
+--  DDR_rut as rut,
+--  sum(case when TDE_CODIGO = 1 then deu_monto else 0 end) as deuda_lur,
+--  sum(case when TDE_CODIGO = 2 then deu_monto else 0 end) as deuda_chq
+--INTO #origen_lur_chq
+--from dbo.GCDF_DEUDA gd with (nolock)
+--where deu_monto > 0
+--and TDE_CODIGO in (1, 2)
+--group by DDR_rut
+
+CREATE TABLE #origen_lur_chq
+(
+rut CHAR(10) NULL
+, deuda_lur numeric(15) null
+, deuda_chq numeric(15) null
+)
+
+
+IF @TipoDeudaLUR = 'SI' OR @TipoDeudaCHQ = 'SI'
+BEGIN
+		INSERT #origen_lur_chq
+		select
+		  DDR_rut as rut,
+		  sum(case when TDE_CODIGO = 1 then deu_monto else 0 end) as deuda_lur,
+		  sum(case when TDE_CODIGO = 2 then deu_monto else 0 end) as deuda_chq
+		--INTO #origen_lur_chq
+		from dbo.GCDF_DEUDA gd with (nolock)
+		where deu_monto > 0
+		and TDE_CODIGO in (1, 2)
+		--and
+		--(
+		--	(@TipoDeudaLUR = 'SI' AND TDE_CODIGO = 1)
+		--	OR 	(@TipoDeudaCHQ = 'SI' AND TDE_CODIGO = 2)
+		--)
+		group by DDR_rut
+
+END
+
+
 
 create nonclustered index ix_origen_chq_rut on #origen_lur_chq (rut)
 --select * from #origen_lur_chq		--9.425 reg en 0 seg.
@@ -875,20 +939,66 @@ and gc.GEC_FECDIGITA = a.GEC_FECDIGITA
 create nonclustered index ix_compromiso_rut on #compromiso (rut)
 --select * from #compromiso		--42.212 reg en 2 seg
 
-
---8.- TABLA #cobrador_asig: Cob. Asignado deuda LUR o CHP
-
-select distinct cob_codigo, ddr_rut rut--, deu_asig_desde
-into #cobrador_asig
-FROM GCDF_DEUDOR_ASIGNADO DAU with (NOLOCK)
-WHERE  
+CREATE TABLE #cobrador_lur_chq
 (
-	deu_asig_desde <= getdate() 
-	and (deu_asig_hasta >= getdate() or deu_asig_hasta is null)
-)  
+cob_codigo numeric(5) null
+, rut char(10) null
+)
 
-create nonclustered index ix_cobrador_asig_rut on #cobrador_asig (rut)
---select * from #cobrador_asig		--15 reg en 0 seg
+IF @TipoDeudaLUR = 'SI' OR @TipoDeudaCHQ = 'SI'
+BEGIN
+		--8.- TABLA #cobrador_lur_chq: Cob. Asignado deuda LUR o CHP
+		insert #cobrador_lur_chq (cob_codigo, rut)
+		select distinct cob_codigo, ddr_rut rut--, deu_asig_desde
+		--into #cobrador_lur_chq
+		FROM GCDF_DEUDOR_ASIGNADO DAU with (NOLOCK)
+		WHERE  
+		(
+			deu_asig_desde <= getdate() 
+			and (deu_asig_hasta >= getdate() or deu_asig_hasta is null)
+		)  
+
+		create nonclustered index ix_cobrador_asig_rut on #cobrador_lur_chq (rut)
+		--select * from #cobrador_lur_chq		--15 reg en 0 seg
+
+END
+
+
+
+CREATE TABLE #cobrador_asig_cotiz
+(
+cob_codigo numeric(5) null
+, rut char(10) null
+)
+
+IF @TipoDeudaCOTIZ = 'SI' 
+BEGIN
+		--8.- TABLA #cobrador_lur_chq: Cob. Asignado deuda LUR o CHP
+		insert #cobrador_asig_cotiz (cob_codigo, rut)
+		select distinct cob_codigo, ddr_rut rut--, deu_asig_desde
+		--into #cobrador_lur_chq
+		FROM DEUDOR_ASIGNADO DAU with (NOLOCK)
+		WHERE  
+		(
+			deu_asig_desde <= getdate() 
+			and (deu_asig_hasta >= getdate() or deu_asig_hasta is null)
+		)  
+		order by ddr_rut
+
+		create nonclustered index ix_cobrador_asig_rut on #cobrador_asig_cotiz (rut)
+		--select * from #cobrador_lur_chq		--15 reg en 0 seg
+
+END
+
+--select * from deudor_asignado
+--order by 3
+
+--LEFT JOIN deudor deu with (nolock) ON tf.rut_deudor = deu.ddr_rut
+--LEFT JOIN deudor_asignado da with (nolock) ON da.DDR_RUT = deu.DDR_RUT 
+--   AND (da.DEU_ASIG_DESDE <= GETDATE() AND (da.DEU_ASIG_HASTA > GETDATE() OR da.DEU_ASIG_HASTA IS NULL))
+--LEFT JOIN cobrador c2 ON c2.COB_CODIGO = da.COB_CODIGO
+
+
 
 
 -- ZONA DE TABLAS FILTROS: COLUMNAS EN LA SALIDA PARA FITRAR 
@@ -973,7 +1083,7 @@ create nonclustered index ix_f_compromiso_vencido_rut on #f_compromiso_vencido(r
 
 select ddr_rut rut , case when sum(isnull(DEU_CUOTAS,0)) > 0 then 'Si' else 'No' end as deuda_lur_con_credito
 into #f_deuda_lur_con_credito
-from GCDF_DEUDA gc with (nolock)
+from GCDF_DEUDA gc with (nolock) 
 join #tabla_final
 	on rut_deudor = ddr_rut
 group by ddr_rut
@@ -985,43 +1095,54 @@ create nonclustered index ix_f_deuda_lur_con_credito_rut on #f_deuda_lur_con_cre
 -- FILTRO Rubro: PREGUNTAR A ALEX		*****
 -- FILTRO Equipo : CONSULTAR A ALEX *************
 
-
 --15 177.234 filas en 8 seg
 UPDATE tf
 SET 
 	monto_posible_compensar = case when ( (isnull(DEUDA_cotizaciones, 0) + isnull(DEUDA_lur, 0)) >= tu.saldo_tfu  ) then  tu.saldo_tfu else (isnull(DEUDA_cotizaciones, 0) + isnull(DEUDA_lur, 0)) end,
     fecha_compromiso = c.fecha,
     monto_compromiso = c.monto,
-    cobrador_asignado_lur_chq = c_asig.cob_codigo,
+    cobrador_asignado_lur_chq = cob_lur_chq.cob_codigo,
+	nom_cob_lurchq = cob_lurchq.cob_nombre,
+	email_cob_lurchq = cob_lurchq.cob_EMAIL,
+	fono_cob_lurchq = cob_lurchq.cob_FONO,
     supervisor_asig = sup.sco_codigo,
     tipo_deudor = COALESCE(vig.vigencia, 'EMPRESA'),
    -- gestion29 = COALESCE(ges.gestion29, 'No'),
     gestion29 = ges.gestion29,
     compromiso_vencido = compv.fecha,
     deuda_lur_con_credito = dlcc.deuda_lur_con_credito,
-    nombre_deudor = d.ddr_nombre,
-	cob_codigo = c2.COB_CODIGO,		--new
-    nombre_ejecutivo = c2.cob_nombre,
-    email_ejecutivo = c2.cob_EMAIL,
-    fono_ejecutivo = c2.cob_FONO,
-    fono_contacto = c2.cob_celular,
-    ciu_codigo_reside = d.CIU_CODIGO
-   , edad_deudor = dbo.f_edad(b.BNF_NACTO, GETDATE())		--***
-   --, edad_deudor = (DATEDIFF(year,b.BNF_NACTO,GETDATE() )+ case when	( Month(GETDATE()) < Month(b.BNF_NACTO) Or (Month(GETDATE()) = Month(b.BNF_NACTO) And Day(GETDATE()) < day(b.BNF_NACTO))) Then -1 else 0 end)
+    nombre_deudor = deu.ddr_nombre,
+	--cob_codigo = c2.COB_CODIGO,		--new
+ --   nombre_ejecutivo = c2.cob_nombre,
+ --   email_ejecutivo = c2.cob_EMAIL,
+ --   fono_ejecutivo = c2.cob_FONO,
+ --   --fono_contacto = c2.cob_celular,
+ 	cob_codigo = cob_cotiz.COB_CODIGO,		--new
+    nombre_ejecutivo = cob_cotiz.cob_nombre,
+    email_ejecutivo = cob_cotiz.cob_EMAIL,
+    fono_ejecutivo = cob_cotiz.cob_FONO,
+    --fono_contacto = c2.cob_celular,
+	fono_contacto = deu.ddr_telefono,		--** usar funcion de datos ddr_telefono ó ddr_celular
+    ciu_codigo_reside = deu.CIU_CODIGO
+   , edad_deudor = dbo.f_edad(benef.BNF_NACTO, GETDATE())		--***
+   --, edad_deudor = (DATEDIFF(year,benef.BNF_NACTO,GETDATE() )+ case when	( Month(GETDATE()) < Month(benef.BNF_NACTO) Or (Month(GETDATE()) = Month(benef.BNF_NACTO) And Day(GETDATE()) < day(b.BNF_NACTO))) Then -1 else 0 end)
 FROM #tabla_final tf
-LEFT JOIN #tfu tu ON tf.rut_deudor = tu.rut
-LEFT JOIN #compromiso c ON tf.rut_deudor = c.rut
-LEFT JOIN #cobrador_asig c_asig ON tf.rut_deudor = c_asig.rut
-LEFT JOIN #f_supervisor_asig sup ON c_asig.cob_codigo = sup.cob_codigo
-LEFT JOIN #f_vigencia_personas vig ON tf.rut_deudor = vig.rut
-LEFT JOIN #f_gestion29 ges ON tf.rut_deudor = ges.rut
-LEFT JOIN #f_compromiso_vencido compv ON tf.rut_deudor = compv.rut
-LEFT JOIN #f_deuda_lur_con_credito dlcc ON tf.rut_deudor = dlcc.rut
-LEFT JOIN deudor d ON tf.rut_deudor = d.ddr_rut
-LEFT JOIN deudor_asignado da ON da.DDR_RUT = d.DDR_RUT 
-   AND (da.DEU_ASIG_DESDE <= GETDATE() AND (da.DEU_ASIG_HASTA > GETDATE() OR da.DEU_ASIG_HASTA IS NULL))
-LEFT JOIN cobrador c2 ON c2.COB_CODIGO = da.COB_CODIGO
-LEFT JOIN BENEFICIARIO b ON b.BNF_RUT = d.DDR_RUT;
+LEFT JOIN #tfu tu with (nolock) ON tf.rut_deudor = tu.rut
+LEFT JOIN #compromiso c with (nolock) ON tf.rut_deudor = c.rut
+LEFT JOIN #cobrador_lur_chq cob_lur_chq with (nolock) ON tf.rut_deudor = cob_lur_chq.rut
+LEFT JOIN #f_supervisor_asig sup with (nolock) ON cob_lur_chq.cob_codigo = sup.cob_codigo
+LEFT JOIN #f_vigencia_personas vig with (nolock) ON tf.rut_deudor = vig.rut
+LEFT JOIN #f_gestion29 ges with (nolock) ON tf.rut_deudor = ges.rut
+LEFT JOIN #f_compromiso_vencido compv with (nolock) ON tf.rut_deudor = compv.rut
+LEFT JOIN #f_deuda_lur_con_credito dlcc with (nolock) ON tf.rut_deudor = dlcc.rut
+LEFT JOIN deudor deu with (nolock) ON tf.rut_deudor = deu.ddr_rut
+--LEFT JOIN deudor_asignado da with (nolock) ON da.DDR_RUT = deu.DDR_RUT 
+--   AND (da.DEU_ASIG_DESDE <= GETDATE() AND (da.DEU_ASIG_HASTA > GETDATE() OR da.DEU_ASIG_HASTA IS NULL))
+LEFT JOIN #cobrador_asig_cotiz cob_asig_cotiz with (nolock) on cob_asig_cotiz.rut = tf.rut_deudor
+LEFT JOIN cobrador cob_cotiz ON cob_cotiz.COB_CODIGO = cob_asig_cotiz.COB_CODIGO
+LEFT JOIN BENEFICIARIO benef with (nolock) ON benef.BNF_RUT = deu.DDR_RUT
+LEFT JOIN cobrador cob_lurchq with (nolock) ON cob_lurchq.COB_CODIGO = cob_lur_chq.cob_codigo;
+
 
 
 --select * #tabla_final		--177.234 reg en 1:14 seg
@@ -1045,6 +1166,9 @@ LEFT JOIN BENEFICIARIO b ON b.BNF_RUT = d.DDR_RUT;
 --		, deuda_lur 
 --		, deuda_chq 
 --		, cobrador_asignado_lur_chq 
+		--, nom_cob_lurchq varchar(100) null
+		--, email_cob_lurchq varchar(100) null
+		--, fono_cob_lurchq varchar(30) null
 --		, fono_contacto 
 --		, supervisor_asig 
 --		, gestion29 
@@ -1082,6 +1206,9 @@ SELECT 	rut_deudor
 		, deuda_lur 
 		, deuda_chq 
 		, cobrador_asignado_lur_chq 
+		, nom_cob_lurchq
+		, email_cob_lurchq
+		, fono_cob_lurchq
 		, fono_contacto 
 		, supervisor_asig 
 		, gestion29 
