@@ -7,12 +7,12 @@
  descripción		:	Lista de deudores a partir de plantillas con filtros asociados.																	
 ========================================================================================*/
 /*	
-GRANT EXECUTE ON [spu_ges_cob_mensajes_obtener_datos_v4] TO public;
-execute spu_ges_cob_mensajes_obtener_datos_v4 1, 'S', 1
+GRANT EXECUTE ON [spu_ges_cob_mensajes_obtener_datos] TO public;
+execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 1
 
 */
 
-alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos_v4] 
+alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos] 
 @epl_codigo varchar(50) = null
 , @enviar char(1) = 'N'
 , @epr_codigo varchar(50) = null
@@ -40,25 +40,37 @@ BEGIN
 	select @primerdiadelmessgte = cast(dateadd(month, datediff(month, 0, getdate()) + 1, 0) as date) 
 	set @ultdiamesanterior = dateadd(day, -1, @primerdiadelmes)
 
-	--validaciones 
-	if not exists (select 1 from gco_envmsg_plantilla with (nolock) where epl_codigo = @epl_codigo)
-	begin
-		select 'no existe plantilla'
-		return 
-	end
 
-	if not exists (select 1 from gco_envmsg_filtro with (nolock) where epl_codigo = @epl_codigo)
-	begin
-		select 'no existe filtros en la plantilla'
-		return 
-	end
+	IF NOT EXISTS (
+	  SELECT 1 
+	  FROM gco_envmsg_plantilla WITH (NOLOCK) 
+	  WHERE epl_codigo = @epl_codigo
+	)
+	BEGIN
+	  RAISERROR('No existe plantilla: %s', 16, 1, @epl_codigo)
+	  RETURN
+	END
+
+	IF NOT EXISTS (
+	  select 1 from gco_envmsg_filtro with (nolock) where epl_codigo = @epl_codigo
+	)
+	BEGIN
+	  RAISERROR('No existe filtros en la plantilla: %s', 16, 1, @epl_codigo)
+	  RETURN
+	END
+
 
 	select @uf_valor = uf_valor from uf with (nolock) where uf_fecha = @ultdiamesanterior
 
 	if @uf_valor is null
 	begin
-		select 'no existe uf'
-		return 
+		--select 'no existe uf'
+		--return 
+		DECLARE @fecha_str VARCHAR(10);
+		SET @fecha_str = CONVERT(VARCHAR(10), @ultdiamesanterior, 120);
+
+		RAISERROR('No existe valor UF para la fecha: %s', 16, 1, @fecha_str);
+		RETURN;
 	end
 
 	if @enviar = 's'
@@ -67,8 +79,10 @@ BEGIN
 
 		if @ate_codigo is null
 		begin
-			select 'no existe programa con api template'
-			return 
+			--select 'no existe programa con api template'
+			--return 
+			  RAISERROR('No existe programa con api template con epr_codigo: %s', 16, 1, @epr_codigo)
+			  RETURN
 		end
 	end
 
