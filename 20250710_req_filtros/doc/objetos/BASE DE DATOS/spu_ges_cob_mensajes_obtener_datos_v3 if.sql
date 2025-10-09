@@ -6,12 +6,12 @@
  fecha creación		:	09-2025                                                    
  descripción		:	Lista de deudores a partir de plantillas con filtros asociados.																	
 ========================================================================================*/
-/*	execute spu_ges_cob_mensajes_obtener_datos_v3 8
+/*	execute spu_ges_cob_mensajes_obtener_datos_v3 1
 
 GRANT EXECUTE ON [spu_ges_cob_mensajes_obtener_datos_v3] TO public;
 */
 
-CREATE procedure [dbo].[spu_ges_cob_mensajes_obtener_datos_v3] 
+alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos_v3] 
 @epl_codigo varchar(50) = null
 , @enviar char(1) = 'N'
 as
@@ -630,9 +630,9 @@ DEALLOCATE CUR_FILTROS
 
 PRINT 'WHERE:_'+@sqlwhere+'_'
 
-PRINT 'WHERE:_'+@TipoDeudaCOTIZ+'_'
-PRINT 'WHERE:_'+@TipoDeudaLUR+'_'
-PRINT 'WHERE:_'+@TipoDeudaCHQ+'_'
+PRINT 'TipoDeudaCOTIZ:_'+@TipoDeudaCOTIZ+'_'
+PRINT 'TipoDeudaLUR:_'+@TipoDeudaLUR+'_'
+PRINT 'TipoDeudaCHQ:_'+@TipoDeudaCHQ+'_'
 
 --REGLA SI NO HAY FILTROS, NO TRAER NADA
 IF isnull(@sqlwhere, '') = '' 
@@ -655,7 +655,8 @@ END
 	if object_id('tempdb..#tabla_final', 'u') is not null drop table #tabla_final
 	if object_id('tempdb..#tfu', 'u') is not null drop table #tfu
 	if object_id('tempdb..#compromiso', 'u') is not null drop table #compromiso
-	if object_id('tempdb..#cobrador_lur_chq', 'u') is not null drop table #cobrador_lur_chq
+	if object_id('tempdb..#cobrador_asig_lurchq', 'u') is not null drop table #cobrador_asig_lurchq
+	if object_id('tempdb..#cobrador_asig_cotiz', 'u') is not null drop table #cobrador_asig_cotiz
 	if object_id('tempdb..#f_supervisor_asig', 'u') is not null drop table #f_supervisor_asig 
 	if object_id('tempdb..#f_vigencia_personas', 'u') is not null drop table #f_vigencia_personas
 	if object_id('tempdb..#f_gestion29', 'u') is not null drop table #f_gestion29
@@ -939,7 +940,9 @@ and gc.GEC_FECDIGITA = a.GEC_FECDIGITA
 create nonclustered index ix_compromiso_rut on #compromiso (rut)
 --select * from #compromiso		--42.212 reg en 2 seg
 
-CREATE TABLE #cobrador_lur_chq
+
+
+CREATE TABLE #cobrador_asig_lurchq
 (
 cob_codigo numeric(5) null
 , rut char(10) null
@@ -947,10 +950,10 @@ cob_codigo numeric(5) null
 
 IF @TipoDeudaLUR = 'SI' OR @TipoDeudaCHQ = 'SI'
 BEGIN
-		--8.- TABLA #cobrador_lur_chq: Cob. Asignado deuda LUR o CHP
-		insert #cobrador_lur_chq (cob_codigo, rut)
+		--8.- TABLA #cobrador_asig_lurchq: Cob. Asignado deuda LUR o CHP
+		insert #cobrador_asig_lurchq (cob_codigo, rut)
 		select distinct cob_codigo, ddr_rut rut--, deu_asig_desde
-		--into #cobrador_lur_chq
+		--into #cobrador_asig_lurchq
 		FROM GCDF_DEUDOR_ASIGNADO DAU with (NOLOCK)
 		WHERE  
 		(
@@ -958,8 +961,8 @@ BEGIN
 			and (deu_asig_hasta >= getdate() or deu_asig_hasta is null)
 		)  
 
-		create nonclustered index ix_cobrador_asig_rut on #cobrador_lur_chq (rut)
-		--select * from #cobrador_lur_chq		--15 reg en 0 seg
+		create nonclustered index ix_cobrador_asig_rut on #cobrador_asig_lurchq (rut)
+		--select * from #cobrador_asig_lurchq		--15 reg en 0 seg
 
 END
 
@@ -973,10 +976,10 @@ cob_codigo numeric(5) null
 
 IF @TipoDeudaCOTIZ = 'SI' 
 BEGIN
-		--8.- TABLA #cobrador_lur_chq: Cob. Asignado deuda LUR o CHP
+		
 		insert #cobrador_asig_cotiz (cob_codigo, rut)
 		select distinct cob_codigo, ddr_rut rut--, deu_asig_desde
-		--into #cobrador_lur_chq
+		--into #cobrador_asig_cotiz
 		FROM DEUDOR_ASIGNADO DAU with (NOLOCK)
 		WHERE  
 		(
@@ -986,7 +989,7 @@ BEGIN
 		order by ddr_rut
 
 		create nonclustered index ix_cobrador_asig_rut on #cobrador_asig_cotiz (rut)
-		--select * from #cobrador_lur_chq		--15 reg en 0 seg
+		--select * from #cobrador_asig_cotiz		--15 reg en 0 seg
 
 END
 
@@ -1122,14 +1125,14 @@ SET
     email_ejecutivo = cob_cotiz.cob_EMAIL,
     fono_ejecutivo = cob_cotiz.cob_FONO,
     --fono_contacto = c2.cob_celular,
-	fono_contacto = deu.ddr_telefono,		--** usar funcion de datos ddr_telefono ó ddr_celular
-    ciu_codigo_reside = deu.CIU_CODIGO
-   , edad_deudor = dbo.f_edad(benef.BNF_NACTO, GETDATE())		--***
+	--fono_contacto = deu.ddr_telefono,		--** usar funcion de datos ddr_telefono ó ddr_celular
+ --   ciu_codigo_reside = deu.CIU_CODIGO
+    edad_deudor = dbo.f_edad(benef.BNF_NACTO, GETDATE())		--***
    --, edad_deudor = (DATEDIFF(year,benef.BNF_NACTO,GETDATE() )+ case when	( Month(GETDATE()) < Month(benef.BNF_NACTO) Or (Month(GETDATE()) = Month(benef.BNF_NACTO) And Day(GETDATE()) < day(b.BNF_NACTO))) Then -1 else 0 end)
 FROM #tabla_final tf
 LEFT JOIN #tfu tu with (nolock) ON tf.rut_deudor = tu.rut
 LEFT JOIN #compromiso c with (nolock) ON tf.rut_deudor = c.rut
-LEFT JOIN #cobrador_lur_chq cob_lur_chq with (nolock) ON tf.rut_deudor = cob_lur_chq.rut
+LEFT JOIN #cobrador_asig_lurchq cob_lur_chq with (nolock) ON tf.rut_deudor = cob_lur_chq.rut
 LEFT JOIN #f_supervisor_asig sup with (nolock) ON cob_lur_chq.cob_codigo = sup.cob_codigo
 LEFT JOIN #f_vigencia_personas vig with (nolock) ON tf.rut_deudor = vig.rut
 LEFT JOIN #f_gestion29 ges with (nolock) ON tf.rut_deudor = ges.rut
@@ -1183,6 +1186,10 @@ LEFT JOIN cobrador cob_lurchq with (nolock) ON cob_lurchq.COB_CODIGO = cob_lur_c
 --		, mayor_per_deuda 
 --		, tipo_deudor 
 --		FROM #tabla_final
+
+
+--, email_destinatario = [dbo].[f_get_datocontacto](rut_deudor,'email') 
+--, fono_contacto
 
 
 declare @sql1 nvarchar(4000)
