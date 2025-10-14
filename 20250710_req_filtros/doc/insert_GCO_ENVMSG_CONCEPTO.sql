@@ -28,3 +28,6 @@ insert into GCO_ENVMSG_CONCEPTO values (16, 'Posible Compensar x TFU', 'M')
 insert into GCO_ENVMSG_CONCEPTO values (17, 'Edad Deudor', 'M')
 
 
+
+GRANT INSERT, UPDATE, DELETE ON [GCO_ENVMSG_PROGRAMA] TO public;
+
