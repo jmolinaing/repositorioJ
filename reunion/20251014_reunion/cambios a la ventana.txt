@@ -1,0 +1,23 @@
+doble click plantilla de mensaje de cobranza
+
+aumentar nombre de valor en la segunda ventana de planilla
+
+los grupos destacados
+
+rectángulo rojo en el treeview
+
+
+seleccionar todo o nada por ejemplo en los contralores
+
+
+tipo cuota , para los deuda cotización quedar como NO.
+
+
+
+PARTIR HABILITADA la segunda ventana
+
+
+un cobrador judicial tiene una s en una columna
+
+
+171 cobrador otros
