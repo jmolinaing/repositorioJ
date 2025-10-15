@@ -115,15 +115,14 @@ BEGIN
 
 		--CONCEPTO 1: GRUPO o Equipo
 		--1 Equipo Interno, 2 Equipo Stock, 3 Equipo judicial, 4 otro
-
 		IF @CODIGO_CONCEPTO = 1 
 		BEGIN
 			IF @NOMBRE_VALOR LIKE '%1%'
 				SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' and equipo_interno = ''SI'' ' ELSE @sqlfiltro + ' and equipo_interno = ''SI'' ' END
 			IF @NOMBRE_VALOR LIKE '%2%'
-				SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' and equipo_juridico = ''SI'' ' ELSE @sqlfiltro + ' and equipo_juridico = ''SI'' ' END
-			IF @NOMBRE_VALOR LIKE '%3%'
 				SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' and equipo_stock = ''SI'' ' ELSE @sqlfiltro + ' and equipo_stock = ''SI'' ' END
+			IF @NOMBRE_VALOR LIKE '%3%'
+				SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' and equipo_juridico = ''SI'' ' ELSE @sqlfiltro + ' and equipo_juridico = ''SI'' ' END
 			IF @NOMBRE_VALOR LIKE '%4%'
 				SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' and equipo_otro = ''SI'' ' ELSE @sqlfiltro + ' and equipo_otro = ''SI'' ' END
 
@@ -346,6 +345,13 @@ BEGIN
 	PRINT 'TipoDeudaLUR:_'+@TipoDeudaLUR+'_'
 	PRINT 'TipoDeudaCHQ:_'+@TipoDeudaCHQ+'_'
 
+	-- Validar que @sqlwhere no esté vacío o malformado
+	IF @sqlwhere IS NULL OR @sqlwhere = ''
+	BEGIN
+		RAISERROR('Filtro dinámico (@sqlwhere) no válido.', 16, 1)
+		RETURN
+	END
+
 	-- SI NO EXISTE WHERE NO SE PODRA EJECUTAR EL PROCESO
 	IF ISNULL(@sqlwhere, '') = '' 
 	BEGIN
@@ -371,7 +377,7 @@ BEGIN
 	if object_id('tempdb..#f_gestion29', 'u') is not null drop table #f_gestion29
 	if object_id('tempdb..#f_compromiso_vencido', 'u') is not null drop table #f_compromiso_vencido
 	if object_id('tempdb..#f_deuda_lur_con_credito', 'u') is not null drop table #f_deuda_lur_con_credito
-
+	if object_id('tempdb..#equipo_cobrador', 'u') is not null drop table #equipo_cobrador
 
 	--#TABLA_FINAL: TABLA DEL RESULTADO FINAL.
 	create table #tabla_final
@@ -410,6 +416,11 @@ BEGIN
 		, mayor_per_deuda datetime null
 		, tipo_deudor varchar(30) null
 		, tipo_empresa varchar(30) null
+		, equipo_interno varchar(2) null
+		, equipo_juridico varchar(2) null
+		, equipo_stock varchar(2) null
+		, equipo_otro varchar(2) null
+		, equipo_cobrador varchar(20) null
 		--, primary key (rut_deudor)
 	)
 
@@ -664,20 +675,19 @@ BEGIN
 	END
 
 
---	/*
-
-select distinct deuda_cob.cob_codigo cob_codigo
-,case when deuda_cob.cob_externo ='S' then 'NO' else 'SI' end as equipo_interno
-,case when coalesce(deuda_cob.cob_judicial,'N') = 'S' then 'SI' else 'NO' end equipo_juridico
-,case when coalesce(cob_dep.cob_codigo,0) = 9000 then 'SI' else 'NO' end equipo_stock
-, case when ( (deuda_cob.cob_externo = 'N') or (coalesce(cob_dep.cob_codigo,0) = 9000) or (coalesce(deuda_cob.cob_judicial,'N') = 'S' ) ) then 'NO' else 'SI' end as equipo_otro
-into #equipo_cobrador
-from cobrador deuda_cob with (nolock) 
-left join cobrador as cob_dep  with (nolock)  on cob_dep.cob_codigo = deuda_cob.cob_codigo_dep
-
---*/
+	--tabla de equipos de cobradores 
+	select distinct deuda_cob.cob_codigo cob_codigo
+	, case when deuda_cob.cob_externo ='S' then NULL else 'SI' end as equipo_interno
+	, case when coalesce(deuda_cob.cob_judicial,'N') = 'S' then 'SI' else NULL end equipo_juridico
+	, case when coalesce(cob_dep.cob_codigo,0) = 9000 then 'SI' else NULL end equipo_stock
+	, case when ( (deuda_cob.cob_externo = 'N') or (coalesce(cob_dep.cob_codigo,0) = 9000) or (coalesce(deuda_cob.cob_judicial,'N') = 'S' ) ) then NULL else 'SI' end as equipo_otro
+	, COALESCE(( case when coalesce(deuda_cob.cob_judicial,'N') = 'S' then 'JUDICIAL' else NULL end ), (case when coalesce(cob_dep.cob_codigo,0) = 9000 then 'STOCK' else NULL end), (case when deuda_cob.cob_externo ='S' then NULL else 'INTERNO' end), (case when ( (deuda_cob.cob_externo = 'N') or (coalesce(cob_dep.cob_codigo,0) = 9000) or (coalesce(deuda_cob.cob_judicial,'N') = 'S' ) ) then NULL else 'OTROS' end)    )  as equipo_cobrador
+	into #equipo_cobrador
+	from cobrador deuda_cob with (nolock) 
+	left join cobrador as cob_dep  with (nolock)  on cob_dep.cob_codigo = deuda_cob.cob_codigo_dep
 
 
+	create nonclustered index ix_equipo_cobrador on #equipo_cobrador(cob_codigo)
 
 
 	--9.- FILTRO Supervisor: Obtener el SUP. vigente desde la tabla COBRADOR_SUP_ASIG
@@ -741,7 +751,7 @@ left join cobrador as cob_dep  with (nolock)  on cob_dep.cob_codigo = deuda_cob.
 
 	-- FILTRO Tipo Empresa: PREGUNTAR A ALEX	******
 	-- FILTRO Rubro: PREGUNTAR A ALEX		*****
-	-- FILTRO Equipo : CONSULTAR A ALEX *************
+
 
 	UPDATE tf
 	SET 
@@ -752,7 +762,7 @@ left join cobrador as cob_dep  with (nolock)  on cob_dep.cob_codigo = deuda_cob.
 		, nom_cob_lurchq = cob_lurchq.cob_nombre
 		, email_cob_lurchq = cob_lurchq.cob_email
 		, fono_cob_lurchq = cob_lurchq.cob_fono
-		, supervisor_asig = sup.sco_codigo						--supervisor
+		, supervisor_asig = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN sup_cotiz.sco_codigo ELSE sup_lur_chq.sco_codigo END 
 		, tipo_deudor = coalesce(vig.vigencia, 'EMPRESA')
 		, gestion29 = ges.gestion29
 		, compromiso_vencido = compv.fecha
@@ -767,32 +777,37 @@ left join cobrador as cob_dep  with (nolock)  on cob_dep.cob_codigo = deuda_cob.
 		, email_destinatario = [dbo].[f_get_datocontacto](tf.rut_deudor,'email') 
 		, fono_contacto = [dbo].[f_get_datocontacto](tf.rut_deudor,'fono') 	
 		, ciu_codigo_reside = deu.ciu_codigo
-		, edad_deudor = dbo.f_edad(benef.bnf_nacto, getdate())		
+		, edad_deudor = dbo.f_edad(benef.bnf_nacto, getdate())	
+		, equipo_interno = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN equipo_cotiz.equipo_interno ELSE equipo_lurchq.equipo_interno END 
+		, equipo_juridico = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN equipo_cotiz.equipo_juridico ELSE equipo_lurchq.equipo_juridico END  
+		, equipo_stock = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN equipo_cotiz.equipo_stock ELSE equipo_lurchq.equipo_stock END 
+		, equipo_otro = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN equipo_cotiz.equipo_otro ELSE equipo_lurchq.equipo_otro END 
+		, equipo_cobrador = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN equipo_cotiz.equipo_cobrador ELSE equipo_lurchq.equipo_cobrador END 
 	from #tabla_final tf
 	left join #tfu tu with (nolock) on tf.rut_deudor = tu.rut
 	left join #compromiso c with (nolock) on tf.rut_deudor = c.rut
 	left join #cobrador_asig_lurchq cob_lur_chq with (nolock) on tf.rut_deudor = cob_lur_chq.rut
-	left join #f_supervisor_asig sup with (nolock) on cob_lur_chq.cob_codigo = sup.cob_codigo
+	left join #f_supervisor_asig sup_lur_chq with (nolock) on cob_lur_chq.cob_codigo = sup_lur_chq.cob_codigo
+	left join #cobrador_asig_cotiz cob_asig_cotiz with (nolock) on cob_asig_cotiz.rut = tf.rut_deudor
+	left join #f_supervisor_asig sup_cotiz with (nolock) on sup_cotiz.cob_codigo = cob_asig_cotiz.cob_codigo
 	left join #f_vigencia_personas vig with (nolock) on tf.rut_deudor = vig.rut
 	left join #f_gestion29 ges with (nolock) on tf.rut_deudor = ges.rut
 	left join #f_compromiso_vencido compv with (nolock) on tf.rut_deudor = compv.rut
 	left join #f_deuda_lur_con_credito dlcc with (nolock) on tf.rut_deudor = dlcc.rut
 	left join deudor deu with (nolock) on tf.rut_deudor = deu.ddr_rut
-	left join #cobrador_asig_cotiz cob_asig_cotiz with (nolock) on cob_asig_cotiz.rut = tf.rut_deudor
 	left join cobrador cob_cotiz on cob_cotiz.cob_codigo = cob_asig_cotiz.cob_codigo
 	left join beneficiario benef with (nolock) on benef.bnf_rut = tf.rut_deudor
-	left join cobrador cob_lurchq with (nolock) on cob_lurchq.cob_codigo = cob_lur_chq.cob_codigo;
+	left join cobrador cob_lurchq with (nolock) on cob_lurchq.cob_codigo = cob_lur_chq.cob_codigo
+	left join #equipo_cobrador equipo_cotiz with (nolock) on equipo_cotiz.cob_codigo = cob_asig_cotiz.cob_codigo
+	left join #equipo_cobrador equipo_lurchq with (nolock) on equipo_lurchq.cob_codigo = cob_lur_chq.cob_codigo;
+
+
 
 	declare @sql1 nvarchar(4000)
 
 	IF @enviar = 'N'
 	BEGIN
-			-- Validar que @sqlwhere no esté vacío o malformado
-			IF @sqlwhere IS NULL OR @sqlwhere = ''
-			BEGIN
-				RAISERROR('Filtro dinámico (@sqlwhere) no válido.', 16, 1)
-				RETURN
-			END
+
 
 			set @sql1 = N'
 			SELECT rut_deudor
@@ -830,6 +845,11 @@ left join cobrador as cob_dep  with (nolock)  on cob_dep.cob_codigo = deuda_cob.
 					, mayor_per_deuda 
 					, tipo_deudor 
 					, tipo_empresa
+					, equipo_interno
+					, equipo_juridico
+					, equipo_stock
+					, equipo_otro
+					, equipo_cobrador
 					FROM #tabla_final
 					where 1 = 1 '+@sqlwhere
 
@@ -861,9 +881,58 @@ left join cobrador as cob_dep  with (nolock)  on cob_dep.cob_codigo = deuda_cob.
 	ELSE	--@enviar = 'S'
 	BEGIN
 
-		BEGIN TRY
-				BEGIN TRANSACTION;
+		--BEGIN TRY
+		--		BEGIN TRANSACTION;
 
+				--INSERT INTO dbo.GCO_ENVMSG_MENSAJE
+				--		   (ATE_CODIGO
+				--		   ,EME_FECHAREG
+				--		   ,EME_FECENVIO
+				--		   ,EME_ESTADO
+				--		   ,RUT_DEUDOR
+				--		   ,EME_NOMBRE_DEUDOR
+				--		   ,EME_EMAIL_DEUDOR
+				--		   ,EME_FONO_DEUDOR
+				--		   ,EME_DEUDA_COTIZ
+				--		   ,EME_DEUDA_LUR
+				--		   ,EME_DEUDA_CHQ
+				--		   ,COB_CODIGO
+				--		   ,EME_DESCRIP_ENVIO)
+				--	SELECT @ATE_CODIGO AS ATE_CODIGO
+				--		, GETDATE() AS EME_FECHAREG
+				--		, NULL AS EME_FECENVIO
+				--		, 0 AS EME_ESTADO
+				--		, RUT_DEUDOR
+				--		, NOMBRE_DEUDOR AS EME_NOMBRE_DEUDOR
+				--		, EMAIL_DESTINATARIO AS EME_EMAIL_DEUDOR
+				--		, FONO_CONTACTO AS EME_FONO_DEUDOR
+				--		, DEUDA_COTIZACIONES AS EME_DEUDA_COTIZ
+				--		, DEUDA_LUR AS EME_DEUDA_LUR
+				--		, DEUDA_CHQ AS EME_DEUDA_CHQ
+				--		, CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN TF.COB_CODIGO ELSE TF.COBRADOR_ASIGNADO_LUR_CHQ END AS COB_CODIGO
+				--		, NULL
+				--	FROM #TABLA_FINAL TF;
+			--END TRY
+
+			--BEGIN CATCH
+			--		-- Si ocurre un error, se revierte la transacción
+			--		IF @@TRANCOUNT > 0
+			--			ROLLBACK TRANSACTION;
+
+			--		SELECT 
+			--			@ErrorMessage = ERROR_MESSAGE(),
+			--			@ErrorSeverity = ERROR_SEVERITY(),
+			--			@ErrorState = ERROR_STATE();
+
+			--		-- Se puede registrar en tabla de log o lanzar un error personalizado
+			--		RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);
+			--END CATCH
+
+			---- Limpieza de tablas temporales
+			--IF OBJECT_ID('tempdb..#tabla_final') IS NOT NULL DROP TABLE #tabla_final
+
+
+			set @sql1 = N'
 				INSERT INTO dbo.GCO_ENVMSG_MENSAJE
 						   (ATE_CODIGO
 						   ,EME_FECHAREG
@@ -878,7 +947,7 @@ left join cobrador as cob_dep  with (nolock)  on cob_dep.cob_codigo = deuda_cob.
 						   ,EME_DEUDA_CHQ
 						   ,COB_CODIGO
 						   ,EME_DESCRIP_ENVIO)
-					SELECT @ATE_CODIGO AS ATE_CODIGO
+					SELECT '+cast(@ATE_CODIGO as varchar(5))+' AS ATE_CODIGO
 						, GETDATE() AS EME_FECHAREG
 						, NULL AS EME_FECENVIO
 						, 0 AS EME_ESTADO
@@ -889,31 +958,35 @@ left join cobrador as cob_dep  with (nolock)  on cob_dep.cob_codigo = deuda_cob.
 						, DEUDA_COTIZACIONES AS EME_DEUDA_COTIZ
 						, DEUDA_LUR AS EME_DEUDA_LUR
 						, DEUDA_CHQ AS EME_DEUDA_CHQ
-						, CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN TF.COB_CODIGO ELSE TF.COBRADOR_ASIGNADO_LUR_CHQ END AS COB_CODIGO
+						, CASE WHEN '''+@TIPODEUDACOTIZ+''' = ''SI'' THEN TF.COB_CODIGO ELSE TF.COBRADOR_ASIGNADO_LUR_CHQ END AS COB_CODIGO
 						, NULL
-					FROM #TABLA_FINAL TF;
+					FROM #TABLA_FINAL TF
+					where 1 = 1 '+@sqlwhere
 
-					--se confirma la transacción
-					COMMIT TRANSACTION;
-	
-			END TRY
+					BEGIN TRY
+						BEGIN TRANSACTION;
 
-			BEGIN CATCH
-					-- Si ocurre un error, se revierte la transacción
-					IF @@TRANCOUNT > 0
-						ROLLBACK TRANSACTION;
+						EXEC sp_executesql @sql1;
 
-					SELECT 
-						@ErrorMessage = ERROR_MESSAGE(),
-						@ErrorSeverity = ERROR_SEVERITY(),
-						@ErrorState = ERROR_STATE();
+						COMMIT TRANSACTION;
+					END TRY
+					BEGIN CATCH
+						IF @@TRANCOUNT > 0
+							ROLLBACK TRANSACTION;
 
-					-- Se puede registrar en tabla de log o lanzar un error personalizado
-					RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);
-			END CATCH
+						SELECT 
+							@ErrorMessage = ERROR_MESSAGE(),
+							@ErrorSeverity = ERROR_SEVERITY(),
+							@ErrorState = ERROR_STATE();
 
-			-- Limpieza de tablas temporales
-			IF OBJECT_ID('tempdb..#tabla_final') IS NOT NULL DROP TABLE #tabla_final
+						RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);
+
+						RETURN;
+					END CATCH
+
+					-- Limpieza de tablas temporales
+					IF OBJECT_ID('tempdb..#tabla_final') IS NOT NULL DROP TABLE #tabla_final
+
 	END
 
 END
