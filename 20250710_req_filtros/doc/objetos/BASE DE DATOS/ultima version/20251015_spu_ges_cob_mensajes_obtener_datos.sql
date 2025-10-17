@@ -346,20 +346,14 @@ BEGIN
 	PRINT 'TipoDeudaCHQ:_'+@TipoDeudaCHQ+'_'
 
 	-- Validar que @sqlwhere no esté vacío o malformado
+	-- SI NO EXISTE WHERE NO SE PODRA EJECUTAR EL PROCESO
 	IF @sqlwhere IS NULL OR @sqlwhere = ''
 	BEGIN
-		RAISERROR('Filtro dinámico (@sqlwhere) no válido.', 16, 1)
+		RAISERROR('No existe filtros @sqlwhere en la plantilla: %s', 16, 1, @epl_codigo)
 		RETURN
 	END
 
-	-- SI NO EXISTE WHERE NO SE PODRA EJECUTAR EL PROCESO
-	IF ISNULL(@sqlwhere, '') = '' 
-	BEGIN
-		SET @sqlwhere = 'AND 1 = 2'
 
-		SELECT 'NO EXISTE WHERE'
-		RETURN 
-	END
 	-- SECCION CREACION DEL WHERE. TERMINO__________
 
 
@@ -561,8 +555,6 @@ BEGIN
 			--UNIVERSO LUR/CHQ
 			SELECT
 				 rut,
-				--case when @TipoDeudaLUR = 'SI' then deuda_lur else null end as deuda_lur,
-				--case when @TipoDeudaCHQ = 'SI' then deuda_chq else null end as deuda_chq
 				deuda_lur,
 				deuda_chq
 			FROM #origen_lur_chq
@@ -845,10 +837,6 @@ BEGIN
 					, mayor_per_deuda 
 					, tipo_deudor 
 					, tipo_empresa
-					, equipo_interno
-					, equipo_juridico
-					, equipo_stock
-					, equipo_otro
 					, equipo_cobrador
 					FROM #tabla_final
 					where 1 = 1 '+@sqlwhere
@@ -880,56 +868,6 @@ BEGIN
 
 	ELSE	--@enviar = 'S'
 	BEGIN
-
-		--BEGIN TRY
-		--		BEGIN TRANSACTION;
-
-				--INSERT INTO dbo.GCO_ENVMSG_MENSAJE
-				--		   (ATE_CODIGO
-				--		   ,EME_FECHAREG
-				--		   ,EME_FECENVIO
-				--		   ,EME_ESTADO
-				--		   ,RUT_DEUDOR
-				--		   ,EME_NOMBRE_DEUDOR
-				--		   ,EME_EMAIL_DEUDOR
-				--		   ,EME_FONO_DEUDOR
-				--		   ,EME_DEUDA_COTIZ
-				--		   ,EME_DEUDA_LUR
-				--		   ,EME_DEUDA_CHQ
-				--		   ,COB_CODIGO
-				--		   ,EME_DESCRIP_ENVIO)
-				--	SELECT @ATE_CODIGO AS ATE_CODIGO
-				--		, GETDATE() AS EME_FECHAREG
-				--		, NULL AS EME_FECENVIO
-				--		, 0 AS EME_ESTADO
-				--		, RUT_DEUDOR
-				--		, NOMBRE_DEUDOR AS EME_NOMBRE_DEUDOR
-				--		, EMAIL_DESTINATARIO AS EME_EMAIL_DEUDOR
-				--		, FONO_CONTACTO AS EME_FONO_DEUDOR
-				--		, DEUDA_COTIZACIONES AS EME_DEUDA_COTIZ
-				--		, DEUDA_LUR AS EME_DEUDA_LUR
-				--		, DEUDA_CHQ AS EME_DEUDA_CHQ
-				--		, CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN TF.COB_CODIGO ELSE TF.COBRADOR_ASIGNADO_LUR_CHQ END AS COB_CODIGO
-				--		, NULL
-				--	FROM #TABLA_FINAL TF;
-			--END TRY
-
-			--BEGIN CATCH
-			--		-- Si ocurre un error, se revierte la transacción
-			--		IF @@TRANCOUNT > 0
-			--			ROLLBACK TRANSACTION;
-
-			--		SELECT 
-			--			@ErrorMessage = ERROR_MESSAGE(),
-			--			@ErrorSeverity = ERROR_SEVERITY(),
-			--			@ErrorState = ERROR_STATE();
-
-			--		-- Se puede registrar en tabla de log o lanzar un error personalizado
-			--		RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);
-			--END CATCH
-
-			---- Limpieza de tablas temporales
-			--IF OBJECT_ID('tempdb..#tabla_final') IS NOT NULL DROP TABLE #tabla_final
 
 
 			set @sql1 = N'
