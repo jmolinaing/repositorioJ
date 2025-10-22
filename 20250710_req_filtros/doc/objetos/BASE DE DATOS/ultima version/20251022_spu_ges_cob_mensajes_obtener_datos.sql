@@ -8,12 +8,19 @@
  
  modificación		:	jorge molina													
  fecha creación		:	22-10-2025                                                    
- descripción		:	se agrego un nuevo párametro del sp :  @epl_fechora	
+ descripción		:	se agrego un nuevo párametro del sp :  @epl_fechora, y en la insercion 
+						del envio GCO_ENVMSG_MENSAJE se agregaron las 2 columnas: ,EPR_CODIGO
+						,EPL_FECHORA
 
 ========================================================================================*/
 /*	
 GRANT EXECUTE ON [spu_ges_cob_mensajes_obtener_datos] TO public;
-execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 1
+
+declare @epl_fechora datetime = getdate()
+
+insert into GCO_ENVMSG_PROGRAMA_LOG values(5, @epl_fechora, null)
+
+execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 5, @epl_fechora
 
 */
 
@@ -903,7 +910,9 @@ BEGIN
 						   ,EME_DEUDA_LUR
 						   ,EME_DEUDA_CHQ
 						   ,COB_CODIGO
-						   ,EME_DESCRIP_ENVIO)
+						   ,EME_DESCRIP_ENVIO
+						   ,EPR_CODIGO
+						   ,EPL_FECHORA)
 					SELECT '+cast(@ATE_CODIGO as varchar(5))+' AS ATE_CODIGO
 						, GETDATE() AS EME_FECHAREG
 						, NULL AS EME_FECENVIO
@@ -917,6 +926,8 @@ BEGIN
 						, DEUDA_CHQ AS EME_DEUDA_CHQ
 						, CASE WHEN '''+@TIPODEUDACOTIZ+''' = ''SI'' THEN TF.COB_CODIGO ELSE TF.COBRADOR_ASIGNADO_LUR_CHQ END AS COB_CODIGO
 						, NULL
+						, CAST(''' + @epr_codigo + ''' AS NUMERIC(10)) AS EPR_CODIGO
+					    , ''' + CONVERT(VARCHAR, ISNULL(@epl_fechora, '19000101'), 121) + ''' AS EPL_FECHORA
 					FROM #TABLA_FINAL TF
 					where 1 = 1 '+@sqlwhere
 
