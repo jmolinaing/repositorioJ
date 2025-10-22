@@ -2,7 +2,7 @@
  tipo de objeto		:	procedimiento almacenado                                        
  nombre del objeto	:	SP_GenerarEnviosPendientes                                                                                                  
  parametros			:			                                                                                 
- creado por			:	jorge molina													
+ creado por			:	Jorge Molina													
  fecha creación		:	10-2025                                                    
  descripción		:	sp orquestador que ejecuta envios pendientes.																
 ========================================================================================*/
@@ -16,6 +16,7 @@ select * from GCO_ENVMSG_MENSAJE
 select * from GCO_ENVMSG_PROGRAMA_LOG
 
 delete GCO_ENVMSG_MENSAJE where eme_codigo not in(1, 2, 3, 4)
+
 */
 
 alter PROCEDURE SP_GenerarEnviosPendientes
@@ -100,14 +101,15 @@ BEGIN
           );
 
 
-   -- SELECT EPL_CODIGO, EPR_CODIGO, EPR_TIPO_ENVIO, EPR_HORA_ENVIO,
-   --        FECHA_ENVIO, FECHA_ENVIO_TOPE, ULTIMA_FECHA_LOG, ULTIMO_TEXTO_ERROR
-   -- FROM #PROGRAMACION
-   -- WHERE FECHA_ENVIO <= GETDATE()
-   --   AND FECHA_ENVIO_TOPE >= GETDATE();
+----stop
+--    SELECT EPL_CODIGO, EPR_CODIGO, EPR_TIPO_ENVIO, EPR_HORA_ENVIO,
+--           FECHA_ENVIO, FECHA_ENVIO_TOPE, ULTIMA_FECHA_LOG, ULTIMO_TEXTO_ERROR
+--    FROM #PROGRAMACION
+--    WHERE FECHA_ENVIO <= GETDATE()
+--      AND FECHA_ENVIO_TOPE >= GETDATE();
 
-	  --return 
-
+--	  return 
+----stop
 
     DECLARE CUR_PROG CURSOR FOR
     SELECT EPL_CODIGO, EPR_CODIGO, EPR_TIPO_ENVIO, EPR_HORA_ENVIO,
@@ -147,7 +149,7 @@ BEGIN
 
                 DECLARE @ErrorMessage NVARCHAR(4000), @ErrorSeverity INT, @ErrorState INT;
 
-                SELECT @ErrorMessage = ERROR_MESSAGE(), @ErrorSeverity = ERROR_SEVERITY(), @ErrorState = ERROR_STATE();
+                SELECT @ErrorMessage = 'Error spu_ges_cob_mensajes_obtener_datos: '+ERROR_MESSAGE(), @ErrorSeverity = ERROR_SEVERITY(), @ErrorState = ERROR_STATE();
 
                 INSERT INTO GCO_ENVMSG_PROGRAMA_LOG (EPR_CODIGO, EPL_FECHORA, EPL_TEXTO_ERROR)
                 VALUES (@EPR_CODIGO, GETDATE(), @ErrorMessage);

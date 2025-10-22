@@ -340,10 +340,13 @@ BEGIN
 	CLOSE CUR_FILTROS
 	DEALLOCATE CUR_FILTROS
 
-	PRINT 'WHERE:_'+@sqlwhere+'_'
-	PRINT 'TipoDeudaCOTIZ:_'+@TipoDeudaCOTIZ+'_'
-	PRINT 'TipoDeudaLUR:_'+@TipoDeudaLUR+'_'
-	PRINT 'TipoDeudaCHQ:_'+@TipoDeudaCHQ+'_'
+	----prueba_
+	--PRINT 'WHERE:_'+@sqlwhere+'_'
+	--PRINT 'TipoDeudaCOTIZ:_'+@TipoDeudaCOTIZ+'_'
+	--PRINT 'TipoDeudaLUR:_'+@TipoDeudaLUR+'_'
+	--PRINT 'TipoDeudaCHQ:_'+@TipoDeudaCHQ+'_'
+	--set @sqlwhere = ''
+	----prueba_
 
 	-- Validar que @sqlwhere no esté vacío o malformado
 	-- SI NO EXISTE WHERE NO SE PODRA EJECUTAR EL PROCESO
