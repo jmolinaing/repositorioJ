@@ -174,10 +174,6 @@ BEGIN
 
 				----2.Ejecuta el SP spu_ges_cob_mensajes_obtener_datos.
 
-				--print 'EPL_CODIGO_'+@EPL_CODIGO+'_'
-				--print 'EPR_CODIGO_'+@EPR_CODIGO+'_'
-				--print 'EPL_FECHORA_'+@EPL_FECHORA+'_'
-
                 EXEC dbo.spu_ges_cob_mensajes_obtener_datos @EPL_CODIGO, 'S', @EPR_CODIGO, @EPL_FECHORA;
 
 				----3.Cuenta los mensajes generados en GCO_ENVMSG_MENSAJE después del log.
