@@ -27,7 +27,7 @@ execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 5, @epl_fechora
 alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos] 
 @epl_codigo varchar(50) = null
 , @enviar char(1) = 'N'
-, @epr_codigo varchar(50) = null
+, @epr_codigo numeric(10) = null
 , @epl_fechora datetime = null
 AS
 BEGIN	
@@ -101,8 +101,6 @@ BEGIN
 
 			if @epl_fechora is null
 			begin
-				--select 'no existe programa con api template'
-				--return 
 				  RAISERROR('Falta parámetro de entrada @epl_fechora, para el código de programa(@epr_codigo): %s', 16, 1, @epr_codigo)
 				  RETURN
 			end
@@ -926,7 +924,7 @@ BEGIN
 						, DEUDA_CHQ AS EME_DEUDA_CHQ
 						, CASE WHEN '''+@TIPODEUDACOTIZ+''' = ''SI'' THEN TF.COB_CODIGO ELSE TF.COBRADOR_ASIGNADO_LUR_CHQ END AS COB_CODIGO
 						, NULL
-						, CAST(''' + @epr_codigo + ''' AS NUMERIC(10)) AS EPR_CODIGO
+						, '+cast(@epr_codigo as varchar(10))+' AS EPR_CODIGO
 					    , ''' + CONVERT(VARCHAR, ISNULL(@epl_fechora, '19000101'), 121) + ''' AS EPL_FECHORA
 					FROM #TABLA_FINAL TF
 					where 1 = 1 '+@sqlwhere
@@ -958,3 +956,6 @@ BEGIN
 	END
 
 END
+
+
+--						, CAST(''' + @epr_codigo + ''' AS NUMERIC(10)) AS EPR_CODIGO
