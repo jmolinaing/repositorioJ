@@ -11,10 +11,6 @@
  descripción  : se agrego un nuevo párametro del sp :  @epl_fechora, y en la insercion   
       del envio GCO_ENVMSG_MENSAJE se agregaron las 2 columnas: ,EPR_CODIGO  
       ,EPL_FECHORA  
-
- modificación  : jorge molina               
- fecha creación  : 22-10-2025                                                      
- descripción  : se quito las columnas:  equipo_interno , equipo_juridico , equipo_stock , equipo_otro de la #tabla_final
   
 ========================================================================================*/  
 /*   
@@ -25,22 +21,15 @@ declare @epl_fechora datetime = getdate()
 insert into GCO_ENVMSG_PROGRAMA_LOG values(5, @epl_fechora, null)  
   
 execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 5, @epl_fechora  
-
-plantilla 1
-deuda: cotizaciones
-equipo interno: 4.333 ok
-equipo judicial: 8.988 ok
-equipo stock: 154.610 ok
-equipo otros: 0 ok
-todos: 167.931
-
+  
 */  
   
-alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos]   
+ALTER procedure [dbo].[spu_ges_cob_mensajes_obtener_datos_20251105]   
 @epl_codigo varchar(50) = null  
 , @enviar char(1) = 'N'  
 , @epr_codigo numeric(10) = null  
 , @epl_fechora datetime = null  
+, @generar_cupones char(1) = 'N'
 AS  
 BEGIN   
  set nocount on;  
@@ -146,22 +135,23 @@ BEGIN
   
   SET @sqlfiltro = ''  
   
+  --CONCEPTO 1: GRUPO o Equipo  
+  --1 Equipo Interno, 2 Equipo Stock, 3 Equipo judicial, 4 otro  
   IF @CODIGO_CONCEPTO = 1   
   BEGIN  
    IF @NOMBRE_VALOR LIKE '%1%'  
-    SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN 'INTERNO' ELSE @sqlfiltro + ''',''INTERNO' END  
+    SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' and equipo_interno = ''SI'' ' ELSE @sqlfiltro + ' and equipo_interno = ''SI'' ' END  
    IF @NOMBRE_VALOR LIKE '%2%'  
-    SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN 'STOCK' ELSE @sqlfiltro + ''',''STOCK' END  
+    SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' and equipo_stock = ''SI'' ' ELSE @sqlfiltro + ' and equipo_stock = ''SI'' ' END  
    IF @NOMBRE_VALOR LIKE '%3%'  
-    SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN 'JUDICIAL' ELSE @sqlfiltro + ''',''JUDICIAL' END  
+    SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' and equipo_juridico = ''SI'' ' ELSE @sqlfiltro + ' and equipo_juridico = ''SI'' ' END  
    IF @NOMBRE_VALOR LIKE '%4%'  
-    SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN 'OTROS' ELSE @sqlfiltro + ''',''OTROS' END  
+    SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' and equipo_otro = ''SI'' ' ELSE @sqlfiltro + ' and equipo_otro = ''SI'' ' END  
   
-   --SET @sqlwhere = @sqlwhere + @sqlfiltro  
-   SET @sqlwhere = @sqlwhere + ' and equipo_cobrador IN ('''+@sqlfiltro+''')' 
+   SET @sqlwhere = @sqlwhere + @sqlfiltro  
   END  
-
-
+  
+  
   
   --CONCEPTO 2: Supervisor   
   IF @CODIGO_CONCEPTO = 2   
@@ -444,7 +434,11 @@ BEGIN
   , menor_per_deuda datetime null  
   , mayor_per_deuda datetime null  
   , tipo_deudor varchar(30) null  
-  , tipo_empresa varchar(30) null   
+  , tipo_empresa varchar(30) null  
+  , equipo_interno varchar(2) null  
+  , equipo_juridico varchar(2) null  
+  , equipo_stock varchar(2) null  
+  , equipo_otro varchar(2) null  
   , equipo_cobrador varchar(20) null  
   --, primary key (rut_deudor)  
  )  
@@ -699,6 +693,10 @@ BEGIN
   
  --tabla de equipos de cobradores   
  select distinct deuda_cob.cob_codigo cob_codigo  
+ , case when coalesce(cob_dep.cob_codigo,0) = 9002 then 'SI' else NULL end as equipo_interno  
+ , case when coalesce(deuda_cob.cob_judicial,'N') = 'S' then 'SI' else NULL end equipo_juridico  
+ , case when coalesce(cob_dep.cob_codigo,0) = 9000 then 'SI' else NULL end equipo_stock  
+ , case when ( (deuda_cob.cob_externo = 'N') or (coalesce(cob_dep.cob_codigo,0) = 9000) or (coalesce(deuda_cob.cob_judicial,'N') = 'S' ) ) then NULL else 'SI' end as equipo_otro  
  , COALESCE(( case when coalesce(deuda_cob.cob_judicial,'N') = 'S' then 'JUDICIAL' else NULL end ), (case when coalesce(cob_dep.cob_codigo,0) = 9000 then 'STOCK' else NULL end), (case when coalesce(cob_dep.cob_codigo,0) = 9002 then 'INTERNO' else NULL end
 ), (case when ( (coalesce(cob_dep.cob_codigo,0) = 9002) or (coalesce(cob_dep.cob_codigo,0) = 9000) or (coalesce(deuda_cob.cob_judicial,'N') = 'S' ) ) then NULL else 'OTROS' end)    )  as equipo_cobrador  
  into #equipo_cobrador  
@@ -881,7 +879,11 @@ BEGIN
   , email_destinatario = em.ctd_email  
   , fono_contacto = fo.ctd_fono  
   , ciu_codigo_reside = deu.ciu_codigo  
-  , edad_deudor = dbo.f_edad(benef.bnf_nacto, getdate())     
+  , edad_deudor = dbo.f_edad(benef.bnf_nacto, getdate())   
+  , equipo_interno = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN equipo_cotiz.equipo_interno ELSE equipo_lurchq.equipo_interno END   
+  , equipo_juridico = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN equipo_cotiz.equipo_juridico ELSE equipo_lurchq.equipo_juridico END    
+  , equipo_stock = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN equipo_cotiz.equipo_stock ELSE equipo_lurchq.equipo_stock END   
+  , equipo_otro = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN equipo_cotiz.equipo_otro ELSE equipo_lurchq.equipo_otro END   
   , equipo_cobrador = CASE WHEN @TIPODEUDACOTIZ = 'SI' THEN equipo_cotiz.equipo_cobrador ELSE equipo_lurchq.equipo_cobrador END   
  from #tabla_final tf  
  left join #tfu tu with (nolock) on tf.rut_deudor = tu.rut  
@@ -903,7 +905,196 @@ BEGIN
  left join #email em on em.cto_rut=tf.rut_deudor  
  left join #fono fo on fo.cto_rut=tf.rut_deudor  
   
+--GENERAR CUPONES
+
+declare @sql0 nvarchar(4000)  
+
+   set @sql0 = N'  
+   SELECT rut_deudor  
+     , nombre_deudor  
+     , email_destinatario   
+     , deuda_cotizaciones   
+     , monto_cupon   
+     , monto_posible_compensar   
+     , cob_codigo  
+     , nombre_ejecutivo   
+     , email_ejecutivo   
+     , fono_ejecutivo   
+     , url_link   
+     , url_link1   
+     , url_link2  
+     , fecha_compromiso   
+     , monto_compromiso   
+     , deuda_lur   
+     , deuda_chq   
+     , cobrador_asignado_lur_chq   
+     , nom_cob_lurchq  
+     , email_cob_lurchq  
+     , fono_cob_lurchq  
+     , fono_contacto   
+     , supervisor_asig   
+     , gestion29   
+     , ciu_codigo_reside   
+     , deuda_lur_con_credito   
+     , edad_deudor   
+     , compromiso_vencido   
+     , dnp   
+     , dpp   
+     , ip   
+     , menor_per_deuda   
+     , mayor_per_deuda   
+     , tipo_deudor   
+     , tipo_empresa  
+     , equipo_cobrador 
+	 into #tabla_final_new 
+     FROM #tabla_final  
+     where 1 = 1 '+@sqlwhere  
   
+     BEGIN TRY  
+      BEGIN TRANSACTION;  
+  
+      EXEC sp_executesql @sql0;  
+  
+      COMMIT TRANSACTION;  
+     END TRY  
+     BEGIN CATCH  
+      IF @@TRANCOUNT > 0  
+       ROLLBACK TRANSACTION;  
+  
+      SELECT   
+       @ErrorMessage = ERROR_MESSAGE(),  
+       @ErrorSeverity = ERROR_SEVERITY(),  
+       @ErrorState = ERROR_STATE();  
+  
+      RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);  
+  
+      RETURN;  
+     END CATCH  
+  
+     -- Limpieza de tablas temporales  
+     IF OBJECT_ID('tempdb..#tabla_final') IS NOT NULL DROP TABLE #tabla_final  
+
+
+
+
+
+--GENERAR CUPONES
+IF @generar_cupones = 'S'
+BEGIN
+    DECLARE @rut_deudor CHAR(10), @tipo_empresa VARCHAR(30), @trama VARCHAR(MAX);
+    DECLARE @link NVARCHAR(100), @correl_gescob numeric(15);
+    DECLARE @desc_deudanom NUMERIC(10), @desc_reajuste NUMERIC(10), @desc_interes NUMERIC(10), @desc_recargo NUMERIC(10);
+
+    DECLARE cursor_deudores CURSOR FOR
+        SELECT rut_deudor, tipo_empresa FROM #tabla_final;
+
+    OPEN cursor_deudores;
+    FETCH NEXT FROM cursor_deudores INTO @rut_deudor, @tipo_empresa;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        IF @tipo_empresa = 'EMPRESA'
+        BEGIN
+            DECLARE @tmp_correlativo TABLE (correl_gescob numeric(15));
+
+            INSERT INTO @tmp_correlativo
+            EXECUTE [MIRROR_NT].[AGENCIAS].[DBO].spu_nuevo_correlativo 'CUPONPAGO_COTIZ_DEUDA';
+
+            SELECT TOP 1 @correl_gescob = correl_gescob FROM @tmp_correlativo;
+
+            IF @correl_gescob <= 0 or @correl_gescob is null
+            BEGIN
+                RAISERROR('Error en la obtención del correlativo', 16, 1);
+                RETURN;
+            END
+
+            INSERT INTO [MIRROR_NT].[AGENCIAS].[DBO].CUPONPAGO_COTIZ_DEUDA
+            (
+                CORREL, COT_RUT, NOM_COTIZANTE, EPA_RUT, EPA_RAZON,
+                DEC_PERIODO, DEC_TIPO_DEUDA, DEC_NRORESOL, PACTADO, PAGADO,
+                DEUDANOMINAL, REAJUSTE, INTERES, RECARGO, TOTAL_APAGAR
+            )
+            SELECT
+                @correl_gescob,
+                tdc.DEC_RUT,
+                tf.nombre_deudor,
+                tdc.EPA_RUT,
+                NULL,
+                tdc.DEC_PERIODO,
+                tdc.DEC_TIPO_DEUDA,
+                NULL,
+                NULL,
+                NULL,
+                tdc.DEUDA_REAJUSTADA,
+                NULL,
+                NULL,
+                NULL,
+                tdc.DEUDA_REAJUSTADA
+            FROM #TMP_DEUDA_COTIZANTE tdc
+            INNER JOIN #tabla_final tf ON tdc.DEC_RUT = tf.rut_deudor
+            WHERE tf.rut_deudor = @rut_deudor;
+
+            EXEC MIRROR_NT.AGENCIAS.dbo.spu_cuponpago_genera_con_descto_empleador
+                @epa_rut = @rut_deudor,
+                @correl_gescob =  @correl_gescob,
+                @desc_deudanom = 0,
+                @desc_reajuste = 0,
+                @desc_interes = 0,
+                @desc_recargo = 0,
+                @usuario = NULL,
+                @hon_cob = NULL,
+                @valida_lagunas = 'S';
+
+            --UPDATE #tabla_final
+            --SET monto_cupon = @cup_correl,
+            --    url_link = 'https://pcotiz.nuevamasvida.cl/?ID=' + CONVERT(VARCHAR, dbo.f_conex_encrip(@cup_correl), 1)
+            --WHERE rut_deudor = @rut_deudor;
+        END
+        ELSE
+        BEGIN
+		print 'hola'
+  /*
+	-- manejo para otros tipos de deudores
+            SET @trama = '';
+            SELECT @trama = STRING_AGG(
+                CAST(DEC_RUT AS VARCHAR) + '|' +
+                CONVERT(VARCHAR, DEC_PERIODO, 112) + '|' +
+                '2|' +
+                CAST(DEC_DEUDA AS VARCHAR) + '|0|0|0|0|0|0|0',
+                '|')
+            FROM #TMP_DEUDA_COTIZANTE
+            WHERE DEC_RUT = @rut_deudor AND DEC_DEUDA > 0
+            ORDER BY DEC_PERIODO;
+
+            EXEC dbo.spu_cuponpago_genera_con_descto
+                @trama = @trama,
+                @usuario = NULL,
+                @hon_cob = NULL,
+                @valida_lagunas = 'S';
+
+            SELECT TOP 1 @cup_correl = cup_correl FROM CUPONPAGO_COTIZ WHERE ddr_rut = @rut_deudor ORDER BY cup_fechareg DESC;
+
+            SET @link = 'https://pcotiz.nuevamasvida.cl/?ID=' + CONVERT(VARCHAR, dbo.f_conex_encrip(@cup_correl), 1);
+
+            UPDATE #tabla_final
+            SET url_link = @link,
+                monto_cupon = @cup_correl
+            WHERE rut_deudor = @rut_deudor;
+		*/
+        END
+
+
+        FETCH NEXT FROM cursor_deudores INTO @rut_deudor, @tipo_empresa;
+    END;
+
+    CLOSE cursor_deudores;
+    DEALLOCATE cursor_deudores;
+END
+
+
+--GENERAR CUPONES: FIN
+
+
   
  declare @sql1 nvarchar(4000)  
   
@@ -948,8 +1139,8 @@ BEGIN
      , tipo_deudor   
      , tipo_empresa  
      , equipo_cobrador  
-     FROM #tabla_final  
-     where 1 = 1 '+@sqlwhere  
+     FROM #tabla_final_new  
+     where 1 = 1 '  
   
      BEGIN TRY  
       BEGIN TRANSACTION;  
@@ -1012,8 +1203,8 @@ BEGIN
       , NULL  
       , CAST(''' + @epr_codigo + ''' AS NUMERIC(10)) AS EPR_CODIGO  
          , ''' + CONVERT(VARCHAR, ISNULL(@epl_fechora, '19000101'), 121) + ''' AS EPL_FECHORA  
-     FROM #TABLA_FINAL TF  
-     where 1 = 1 '+@sqlwhere  
+     FROM #tabla_final_new TF  
+     where 1 = 1 '  
   
      BEGIN TRY  
       BEGIN TRANSACTION;  
