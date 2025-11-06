@@ -20,7 +20,10 @@ declare @epl_fechora datetime = getdate()
   
 insert into GCO_ENVMSG_PROGRAMA_LOG values(5, @epl_fechora, null)  
   
-execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 5, @epl_fechora  
+execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 5, @epl_fechora  --167.931 reg 2min
+
+execute spu_ges_cob_mensajes_obtener_datos_20251105 1, 'S', 5, @epl_fechora  
+
   
 */  
   
@@ -396,7 +399,9 @@ BEGIN
  if object_id('tempdb..#f_gestion29', 'u') is not null drop table #f_gestion29  
  if object_id('tempdb..#f_compromiso_vencido', 'u') is not null drop table #f_compromiso_vencido  
  if object_id('tempdb..#f_deuda_lur_con_credito', 'u') is not null drop table #f_deuda_lur_con_credito  
- if object_id('tempdb..#equipo_cobrador', 'u') is not null drop table #equipo_cobrador  
+ if object_id('tempdb..#equipo_cobrador', 'u') is not null drop table #equipo_cobrador 
+ 
+ if object_id('tempdb..#tabla_proceso', 'u') is not null drop table #tabla_proceso  
   
  --#TABLA_FINAL: TABLA DEL RESULTADO FINAL.  
  create table #tabla_final  
@@ -441,7 +446,52 @@ BEGIN
   , equipo_otro varchar(2) null  
   , equipo_cobrador varchar(20) null  
   --, primary key (rut_deudor)  
- )  
+ ) 
+ 
+  --#TABLA_FINAL: TABLA DEL RESULTADO FINAL.  
+ create table #tabla_proceso  
+ ( rut_deudor char(10) not null  
+  , nombre_deudor varchar(100) null  
+  , email_destinatario varchar(100) null  
+  , deuda_cotizaciones numeric(15) null  
+  , monto_cupon numeric(15) null --**  
+  , monto_posible_compensar numeric(15) null  
+  , cob_codigo numeric(5) null --**  
+  , nombre_ejecutivo varchar(100) null  
+  , email_ejecutivo varchar(100) null  
+  , fono_ejecutivo varchar(30) null  
+  , url_link varchar(100) null  
+  , url_link1 varchar(100) null  
+  , url_link2 varchar(100) null  
+  , fecha_compromiso datetime null  
+  , monto_compromiso numeric(15) null  
+  , deuda_lur numeric(15) null  
+  , deuda_chq numeric(15) null  
+  , cobrador_asignado_lur_chq numeric(10) null  
+  , nom_cob_lurchq varchar(100) null  
+  , email_cob_lurchq varchar(100) null  
+  , fono_cob_lurchq varchar(30) null  
+  , fono_contacto varchar(50) null  
+  , supervisor_asig numeric(4) null --*  
+  , gestion29 varchar(2) null  
+  , ciu_codigo_reside numeric(4) null   
+  , deuda_lur_con_credito varchar(2) null  
+  , edad_deudor numeric(4) null  
+  , compromiso_vencido datetime null  
+  , dnp numeric(4) null  
+  , dpp numeric(4) null  
+  , ip numeric(4) null  
+  , menor_per_deuda datetime null  
+  , mayor_per_deuda datetime null  
+  , tipo_deudor varchar(30) null  
+  , tipo_empresa varchar(30) null  
+  , equipo_interno varchar(2) null  
+  , equipo_juridico varchar(2) null  
+  , equipo_stock varchar(2) null  
+  , equipo_otro varchar(2) null  
+  , equipo_cobrador varchar(20) null  
+  --, primary key (rut_deudor)  
+ ) 
   
  create table #DEUDA_COTIZ_EMPL  
  (  
@@ -909,46 +959,123 @@ BEGIN
 
 declare @sql0 nvarchar(4000)  
 
-   set @sql0 = N'  
-   SELECT rut_deudor  
-     , nombre_deudor  
-     , email_destinatario   
-     , deuda_cotizaciones   
-     , monto_cupon   
-     , monto_posible_compensar   
-     , cob_codigo  
-     , nombre_ejecutivo   
-     , email_ejecutivo   
-     , fono_ejecutivo   
-     , url_link   
-     , url_link1   
-     , url_link2  
-     , fecha_compromiso   
-     , monto_compromiso   
-     , deuda_lur   
-     , deuda_chq   
-     , cobrador_asignado_lur_chq   
-     , nom_cob_lurchq  
-     , email_cob_lurchq  
-     , fono_cob_lurchq  
-     , fono_contacto   
-     , supervisor_asig   
-     , gestion29   
-     , ciu_codigo_reside   
-     , deuda_lur_con_credito   
-     , edad_deudor   
-     , compromiso_vencido   
-     , dnp   
-     , dpp   
-     , ip   
-     , menor_per_deuda   
-     , mayor_per_deuda   
-     , tipo_deudor   
-     , tipo_empresa  
-     , equipo_cobrador 
-	 into #tabla_final_new 
-     FROM #tabla_final  
-     where 1 = 1 '+@sqlwhere  
+------metodo 1 : no funciona
+--   set @sql0 = N'  
+--   SELECT rut_deudor  
+--     , nombre_deudor  
+--     , email_destinatario   
+--     , deuda_cotizaciones   
+--     , monto_cupon   
+--     , monto_posible_compensar   
+--     , cob_codigo  
+--     , nombre_ejecutivo   
+--     , email_ejecutivo   
+--     , fono_ejecutivo   
+--     , url_link   
+--     , url_link1   
+--     , url_link2  
+--     , fecha_compromiso   
+--     , monto_compromiso   
+--     , deuda_lur   
+--     , deuda_chq   
+--     , cobrador_asignado_lur_chq   
+--     , nom_cob_lurchq  
+--     , email_cob_lurchq  
+--     , fono_cob_lurchq  
+--     , fono_contacto   
+--     , supervisor_asig   
+--     , gestion29   
+--     , ciu_codigo_reside   
+--     , deuda_lur_con_credito   
+--     , edad_deudor   
+--     , compromiso_vencido   
+--     , dnp   
+--     , dpp   
+--     , ip   
+--     , menor_per_deuda   
+--     , mayor_per_deuda   
+--     , tipo_deudor   
+--     , tipo_empresa 
+--      , equipo_interno  
+--  , equipo_juridico 
+--  , equipo_stock 
+--  , equipo_otro 
+--     , equipo_cobrador 
+--	 into #tabla_proceso
+--     FROM #tabla_final  
+--     where 1 = 1 '+@sqlwhere  
+
+--metodo 2 : no funciona
+--   set @sql0 = N' 
+--   insert into #tabla_proceso
+--   SELECT rut_deudor  
+--     , nombre_deudor  
+--     , email_destinatario   
+--     , deuda_cotizaciones   
+--     , monto_cupon   
+--     , monto_posible_compensar   
+--     , cob_codigo  
+--     , nombre_ejecutivo   
+--     , email_ejecutivo   
+--     , fono_ejecutivo   
+--     , url_link   
+--     , url_link1   
+--     , url_link2  
+--     , fecha_compromiso   
+--     , monto_compromiso   
+--     , deuda_lur   
+--     , deuda_chq   
+--     , cobrador_asignado_lur_chq   
+--     , nom_cob_lurchq  
+--     , email_cob_lurchq  
+--     , fono_cob_lurchq  
+--     , fono_contacto   
+--     , supervisor_asig   
+--     , gestion29   
+--     , ciu_codigo_reside   
+--     , deuda_lur_con_credito   
+--     , edad_deudor   
+--     , compromiso_vencido   
+--     , dnp   
+--     , dpp   
+--     , ip   
+--     , menor_per_deuda   
+--     , mayor_per_deuda   
+--     , tipo_deudor   
+--     , tipo_empresa 
+--      , equipo_interno  
+--  , equipo_juridico 
+--  , equipo_stock 
+--  , equipo_otro 
+--     , equipo_cobrador 
+--     FROM #tabla_final  
+--     where 1 = 1 '+@sqlwhere 
+
+
+----metodo 3: no funciona
+--   set @sql0 = N' 
+--   insert into #tabla_proceso
+--   SELECT * 
+--     FROM #tabla_final  
+--     where 1 = 1 '+@sqlwhere 
+
+----metodo 4: no funciona
+   --set @sql0 = N' 
+   --SELECT top 1 * 
+   --  FROM #tabla_final 
+   --  union all
+   --SELECT * 
+   --  FROM #tabla_final  
+   --  where 1 = 1 '+@sqlwhere 
+
+set @sql0 = N'
+   SELECT TOP 1 * FROM #tabla_final
+   UNION ALL
+   SELECT * FROM #tabla_final
+   WHERE 1=1 ' + @sqlwhere
+
+     --execute spu_ges_cob_mensajes_obtener_datos_20251105 1
+
   
      BEGIN TRY  
       BEGIN TRANSACTION;  
@@ -972,8 +1099,11 @@ declare @sql0 nvarchar(4000)
      END CATCH  
   
      -- Limpieza de tablas temporales  
-     IF OBJECT_ID('tempdb..#tabla_final') IS NOT NULL DROP TABLE #tabla_final  
+     --IF OBJECT_ID('tempdb..#tabla_final') IS NOT NULL DROP TABLE #tabla_final  
+    --select * from #tabla_final
+    --select * from #tabla_proceso
 
+     return;
 
 
 

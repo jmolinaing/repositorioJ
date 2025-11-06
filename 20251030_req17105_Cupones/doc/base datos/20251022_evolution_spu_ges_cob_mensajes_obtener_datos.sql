@@ -21,10 +21,11 @@ declare @epl_fechora datetime = getdate()
 insert into GCO_ENVMSG_PROGRAMA_LOG values(5, @epl_fechora, null)  
   
 execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 5, @epl_fechora  
+execute spu_ges_cob_mensajes_obtener_datos_evolution 1, 'S', 5, @epl_fechora  
   
 */  
   
-CREATE procedure [dbo].[spu_ges_cob_mensajes_obtener_datos]   
+CREATE procedure [dbo].[spu_ges_cob_mensajes_obtener_datos_evolution]   
 @epl_codigo varchar(50) = null  
 , @enviar char(1) = 'N'  
 , @epr_codigo numeric(10) = null  
