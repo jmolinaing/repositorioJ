@@ -18,9 +18,14 @@
 
   modificación  : jorge molina               
  fecha creación  : 06-11-2025                                                      
- descripción  : a) se corrije INSERT INTO dbo.GCO_ENVMSG_MENSAJE ya que el su campo EPR_CODIGO cambio de varchar a numeric
+ descripción  : a) se corrige INSERT INTO dbo.GCO_ENVMSG_MENSAJE ya que el su campo EPR_CODIGO cambio de varchar a numeric
 				b) Se crea #tabla_final_filtrada, copia en estructura de #tabla_final, y contendra los registros filtrados.
 				c) que si el @enviar = 'S' se debe validar la existencia del parametro @epr_codigo
+				d) se corrige filtro CONCEPTO 4 Grupo Deuda: VALORES A, B, C
+
+  modificación  : jorge molina               
+ fecha creación  : 07-11-2025                                                      
+ descripción  : a)se corrige filtro EDAD DEUDOR
   
 ========================================================================================*/  
 /*   
@@ -32,30 +37,14 @@ execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 5, @epl_fechora
 
 */  
   
---alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos]   
---@epl_codigo varchar(50) = null  
---, @enviar char(1) = 'N'  
---, @epr_codigo numeric(10) = null  
---, @epl_fechora datetime = null  
---AS  
---BEGIN   
--- set nocount on;  
-
-declare @epl_codigo varchar(50) 
-declare @enviar char(1) 
-declare @epr_codigo numeric(10) 
-declare @epl_fechora datetime  
-
-set @epl_codigo = 1	--1.161 y en otro momento 1.161 REG en 46 seg -- SELECT *  FROM #tabla_final where 1 = 1  and equipo_cobrador IN ('INTERNO') and deuda_cotizaciones <= 39597.67 and deuda_cotizaciones > 0
-set @epl_codigo = 2	--0 REG en 0 seg --	SELECT *  FROM #tabla_final  where 1 = 1  and deuda_cotizaciones <= 39597.67 and deuda_cotizaciones <= 79195.34 and deuda_cotizaciones > 118793.01 and TIPO_DEUDOR IN ('VIGENTE')
-set @epl_codigo = 3	--6.037 REG en 30 seg --SELECT *  FROM #tabla_final where 1 = 1  and equipo_cobrador IN ('OTROS') and deuda_lur > 0 and deuda_lur_con_credito IN ('No')
-set @epl_codigo = 4	--0 REG en 0 seg	--SELECT *  FROM #tabla_final where 1 = 1  and equipo_cobrador IN ('INTERNO','STOCK','JUDICIAL') and deuda_cotizaciones <= 39597.67 and deuda_cotizaciones <= 79195.34 and deuda_cotizaciones > 118793.01 and deuda_cotizaciones > 0
-set @epl_codigo = 5	--20.000 REG en 60 seg	--SELECT * FROM #tabla_final  where 1 = 1  and equipo_cobrador IN ('INTERNO','STOCK') and TIPO_DEUDOR IN ('EMPRESA') and deuda_cotizaciones > 0
-set @epl_codigo = 6	--0 REG en 0 seg  --SELECT * FROM #tabla_final  where 1 = 1  and equipo_cobrador IN ('INTERNO') and TIPO_DEUDOR IN ('VIGENTE','NO VIGENTE') and gestion29 IN ('No') and deuda_cotizaciones > 0 AND menor_per_deuda IS NOT NULL  and menor_per_deuda >= convert(datetime, '2025-05-01 00:00:00.000', 121)
-set @epl_codigo = 7	--0 REG en 0 seg   --SELECT * FROM #tabla_final  where 1 = 1  and equipo_cobrador IN ('STOCK') and TIPO_DEUDOR IN ('VIGENTE','NO VIGENTE') and gestion29 IN ('No') and deuda_cotizaciones > 0 AND mayor_per_deuda IS NOT NULL  and mayor_per_deuda >= convert(datetime, '2025-07-01 00:00:00.000', 121)
-set @epl_codigo = 1
-
-set @enviar = 'N'
+alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos]   
+@epl_codigo varchar(50) = null  
+, @enviar char(1) = 'N'  
+, @epr_codigo numeric(10) = null  
+, @epl_fechora datetime = null  
+AS  
+BEGIN   
+ set nocount on;  
   
  declare @sqlwhere nvarchar(4000)  
  declare @sqlfiltro nvarchar(1000)  
@@ -161,6 +150,8 @@ set @enviar = 'N'
  WHILE @@FETCH_STATUS = 0  
  BEGIN  
   
+  
+  
   SET @sqlfiltro = ''  
   
   IF @CODIGO_CONCEPTO = 1   
@@ -199,32 +190,13 @@ set @enviar = 'N'
   -- --2 Afiliados Vigentes GRUPO B (DEUDA <= A UF 2)   
   -- --3 Afiliados Vigentes GRUPO C (DEUDA > A UF 3)  
 
+-- correccion
 --grupo A deuda de 0 cero y menores a 1 UF(incluye 1 uf)
 --grupo B deuda mayores a 1 uf y menores o iguales a 2 uf
 --grupo c deudas mayores a 2 uf
 
   IF @CODIGO_CONCEPTO = 4   
   BEGIN  
-   --IF @NOMBRE_VALOR LIKE '%1%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones <= '+CAST(@UF_VALOR AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones <= '+CAST(@UF_VALOR AS VARCHAR(20)) END  
-   --IF @NOMBRE_VALOR LIKE '%2%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones <= '+CAST(@UF_VALOR*2 AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones <= '+CAST(@UF_VALOR*2 AS VARCHAR(20)) END  
-   --IF @NOMBRE_VALOR LIKE '%3%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones > '+CAST(@UF_VALOR*3 AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones > '+CAST(@UF_VALOR*3 AS VARCHAR(20)) END  
-
-   --IF @NOMBRE_VALOR LIKE '%1%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones > 0 and deuda_cotizaciones <= '+CAST(@UF_VALOR AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones > 0 and deuda_cotizaciones <= '+CAST(@UF_VALOR AS VARCHAR(20)) END  
-   --IF @NOMBRE_VALOR LIKE '%2%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones > '+CAST(@UF_VALOR AS VARCHAR(20))+' and deuda_cotizaciones < '+CAST(@UF_VALOR*3 AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones > '+CAST(@UF_VALOR AS VARCHAR(20))+' and deuda_cotizaciones < '+CAST(@UF_VALOR*3 AS VARCHAR(20)) END  
-   --IF @NOMBRE_VALOR LIKE '%3%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones >= '+CAST(@UF_VALOR*3 AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones >= '+CAST(@UF_VALOR*3 AS VARCHAR(20)) END  
-
 
    IF @NOMBRE_VALOR LIKE '%1%'  
     SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN '  (deuda_cotizaciones > 0 and deuda_cotizaciones <= '+CAST(@UF_VALOR AS VARCHAR(20))+') '  
@@ -236,11 +208,12 @@ set @enviar = 'N'
     SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN '  (deuda_cotizaciones > '+CAST(@UF_VALOR*2 AS VARCHAR(20)) +') ' 
              ELSE ' or (deuda_cotizaciones > '+CAST(@UF_VALOR*2 AS VARCHAR(20)) +') '  END  
 
+	--cuando hay tramos
 	if @sqlfiltro <> ''
 	begin 
 		set @sqlfiltro = ' AND ('+@sqlfiltro+') '
 	end
-  
+
    SET @sqlwhere = @sqlwhere + @sqlfiltro  
   END  
   
@@ -401,6 +374,7 @@ set @enviar = 'N'
   --1 18-25, 2 26-40, 3 41 - 55,4 Otros  
   IF @CODIGO_CONCEPTO = 17   
   BEGIN  
+
    IF @NOMBRE_VALOR LIKE '%1%'  
     SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' ( EDAD_DEUDOR >= 18 and EDAD_DEUDOR <= 25 ) ' ELSE @sqlfiltro + ' OR ( EDAD_DEUDOR >= 18 and EDAD_DEUDOR <= 25 ) ' END  
    IF @NOMBRE_VALOR LIKE '%2%'  
@@ -461,9 +435,10 @@ set @enviar = 'N'
  if object_id('tempdb..#f_gestion29', 'u') is not null drop table #f_gestion29  
  if object_id('tempdb..#f_compromiso_vencido', 'u') is not null drop table #f_compromiso_vencido  
  if object_id('tempdb..#f_deuda_lur_con_credito', 'u') is not null drop table #f_deuda_lur_con_credito  
- if object_id('tempdb..#equipo_cobrador', 'u') is not null drop table #equipo_cobrador 
+ if object_id('tempdb..#equipo_cobrador', 'u') is not null drop table #equipo_cobrador  
  if object_id('tempdb..#email', 'u') is not null drop table #email 
  if object_id('tempdb..#fono', 'u') is not null drop table #fono
+
   
  --#TABLA_FINAL: TABLA DEL RESULTADO FINAL.  
  create table #tabla_final  
@@ -477,7 +452,7 @@ set @enviar = 'N'
   , nombre_ejecutivo varchar(100) null  
   , email_ejecutivo varchar(100) null  
   , fono_ejecutivo varchar(30) null  
-  , url_link varchar(max) null  
+  , url_link varchar(100) null  
   , url_link1 varchar(100) null  
   , url_link2 varchar(100) null  
   , fecha_compromiso datetime null  
@@ -500,8 +475,8 @@ set @enviar = 'N'
   , ip numeric(4) null  
   , menor_per_deuda datetime null  
   , mayor_per_deuda datetime null  
-  , tipo_deudor varchar(30) null  
-  , tipo_empresa varchar(30) null   
+  , tipo_deudor varchar(30) null		--Valores: VIGENTE, NO VIGENTE, EMPRESA
+  , tipo_empresa varchar(30) null		--Valores: COTIZANTE, EMPRESA
   , equipo_cobrador varchar(20) null  
   , cup_correl numeric(15) null
   --, primary key (rut_deudor)  
@@ -975,8 +950,6 @@ declare @sqlfiltrado nvarchar(4000)
 	SELECT *  
 	FROM #tabla_final  
 	where 1 = 1 '+@sqlwhere  
-
-	 PRINT '@sqlfiltrado:'+@sqlfiltrado+'_'
   
 	BEGIN TRY  
 		BEGIN TRANSACTION;  
@@ -1046,8 +1019,6 @@ declare @sqlfiltrado nvarchar(4000)
      , equipo_cobrador  
      FROM #tabla_final_filtrada  
      where 1 = 1 ' 
-
-
   
      BEGIN TRY  
       BEGIN TRANSACTION;  
@@ -1139,8 +1110,4 @@ declare @sqlfiltrado nvarchar(4000)
   
  END  
   
---END
-
-
-
-
+END

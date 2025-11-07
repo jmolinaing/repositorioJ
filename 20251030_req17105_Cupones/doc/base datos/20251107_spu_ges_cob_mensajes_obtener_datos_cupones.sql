@@ -18,9 +18,14 @@
 
   modificación  : jorge molina               
  fecha creación  : 06-11-2025                                                      
- descripción  : a) se corrije INSERT INTO dbo.GCO_ENVMSG_MENSAJE ya que el su campo EPR_CODIGO cambio de varchar a numeric
+ descripción  : a) se corrige INSERT INTO dbo.GCO_ENVMSG_MENSAJE ya que el su campo EPR_CODIGO cambio de varchar a numeric
 				b) Se crea #tabla_final_filtrada, copia en estructura de #tabla_final, y contendra los registros filtrados.
 				c) que si el @enviar = 'S' se debe validar la existencia del parametro @epr_codigo
+				d) se corrige filtro CONCEPTO 4 Grupo Deuda: VALORES A, B, C
+
+  modificación  : jorge molina               
+ fecha creación  : 07-11-2025                                                      
+ descripción  : a)se corrige filtro EDAD DEUDOR
   
 ========================================================================================*/  
 /*   
@@ -30,32 +35,20 @@ declare @epl_fechora datetime = getdate()
 insert into GCO_ENVMSG_PROGRAMA_LOG values(5, @epl_fechora, null)  
 execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 5, @epl_fechora  
 
+execute spu_ges_cob_mensajes_obtener_datos 1
+execute spu_ges_cob_mensajes_obtener_datos_cupones 1		--eran 843 reg aprox en 30 seg aprox, pero con cupon:
+
 */  
   
---alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos]   
---@epl_codigo varchar(50) = null  
---, @enviar char(1) = 'N'  
---, @epr_codigo numeric(10) = null  
---, @epl_fechora datetime = null  
---AS  
---BEGIN   
--- set nocount on;  
-
-declare @epl_codigo varchar(50) 
-declare @enviar char(1) 
-declare @epr_codigo numeric(10) 
-declare @epl_fechora datetime  
-
-set @epl_codigo = 1	--1.161 y en otro momento 1.161 REG en 46 seg -- SELECT *  FROM #tabla_final where 1 = 1  and equipo_cobrador IN ('INTERNO') and deuda_cotizaciones <= 39597.67 and deuda_cotizaciones > 0
-set @epl_codigo = 2	--0 REG en 0 seg --	SELECT *  FROM #tabla_final  where 1 = 1  and deuda_cotizaciones <= 39597.67 and deuda_cotizaciones <= 79195.34 and deuda_cotizaciones > 118793.01 and TIPO_DEUDOR IN ('VIGENTE')
-set @epl_codigo = 3	--6.037 REG en 30 seg --SELECT *  FROM #tabla_final where 1 = 1  and equipo_cobrador IN ('OTROS') and deuda_lur > 0 and deuda_lur_con_credito IN ('No')
-set @epl_codigo = 4	--0 REG en 0 seg	--SELECT *  FROM #tabla_final where 1 = 1  and equipo_cobrador IN ('INTERNO','STOCK','JUDICIAL') and deuda_cotizaciones <= 39597.67 and deuda_cotizaciones <= 79195.34 and deuda_cotizaciones > 118793.01 and deuda_cotizaciones > 0
-set @epl_codigo = 5	--20.000 REG en 60 seg	--SELECT * FROM #tabla_final  where 1 = 1  and equipo_cobrador IN ('INTERNO','STOCK') and TIPO_DEUDOR IN ('EMPRESA') and deuda_cotizaciones > 0
-set @epl_codigo = 6	--0 REG en 0 seg  --SELECT * FROM #tabla_final  where 1 = 1  and equipo_cobrador IN ('INTERNO') and TIPO_DEUDOR IN ('VIGENTE','NO VIGENTE') and gestion29 IN ('No') and deuda_cotizaciones > 0 AND menor_per_deuda IS NOT NULL  and menor_per_deuda >= convert(datetime, '2025-05-01 00:00:00.000', 121)
-set @epl_codigo = 7	--0 REG en 0 seg   --SELECT * FROM #tabla_final  where 1 = 1  and equipo_cobrador IN ('STOCK') and TIPO_DEUDOR IN ('VIGENTE','NO VIGENTE') and gestion29 IN ('No') and deuda_cotizaciones > 0 AND mayor_per_deuda IS NOT NULL  and mayor_per_deuda >= convert(datetime, '2025-07-01 00:00:00.000', 121)
-set @epl_codigo = 1
-
-set @enviar = 'N'
+alter procedure [dbo].[spu_ges_cob_mensajes_obtener_datos_cupones]   
+@epl_codigo varchar(50) = null  
+, @enviar char(1) = 'N'  
+, @epr_codigo numeric(10) = null  
+, @epl_fechora datetime = null  
+, @generar_cupones char(1) = 'N'
+AS  
+BEGIN   
+ set nocount on;  
   
  declare @sqlwhere nvarchar(4000)  
  declare @sqlfiltro nvarchar(1000)  
@@ -161,6 +154,8 @@ set @enviar = 'N'
  WHILE @@FETCH_STATUS = 0  
  BEGIN  
   
+  
+  
   SET @sqlfiltro = ''  
   
   IF @CODIGO_CONCEPTO = 1   
@@ -199,32 +194,13 @@ set @enviar = 'N'
   -- --2 Afiliados Vigentes GRUPO B (DEUDA <= A UF 2)   
   -- --3 Afiliados Vigentes GRUPO C (DEUDA > A UF 3)  
 
+-- correccion
 --grupo A deuda de 0 cero y menores a 1 UF(incluye 1 uf)
 --grupo B deuda mayores a 1 uf y menores o iguales a 2 uf
 --grupo c deudas mayores a 2 uf
 
   IF @CODIGO_CONCEPTO = 4   
   BEGIN  
-   --IF @NOMBRE_VALOR LIKE '%1%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones <= '+CAST(@UF_VALOR AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones <= '+CAST(@UF_VALOR AS VARCHAR(20)) END  
-   --IF @NOMBRE_VALOR LIKE '%2%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones <= '+CAST(@UF_VALOR*2 AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones <= '+CAST(@UF_VALOR*2 AS VARCHAR(20)) END  
-   --IF @NOMBRE_VALOR LIKE '%3%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones > '+CAST(@UF_VALOR*3 AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones > '+CAST(@UF_VALOR*3 AS VARCHAR(20)) END  
-
-   --IF @NOMBRE_VALOR LIKE '%1%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones > 0 and deuda_cotizaciones <= '+CAST(@UF_VALOR AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones > 0 and deuda_cotizaciones <= '+CAST(@UF_VALOR AS VARCHAR(20)) END  
-   --IF @NOMBRE_VALOR LIKE '%2%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones > '+CAST(@UF_VALOR AS VARCHAR(20))+' and deuda_cotizaciones < '+CAST(@UF_VALOR*3 AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones > '+CAST(@UF_VALOR AS VARCHAR(20))+' and deuda_cotizaciones < '+CAST(@UF_VALOR*3 AS VARCHAR(20)) END  
-   --IF @NOMBRE_VALOR LIKE '%3%'  
-   -- SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN ' and deuda_cotizaciones >= '+CAST(@UF_VALOR*3 AS VARCHAR(20))  
-   --          ELSE ' and deuda_cotizaciones >= '+CAST(@UF_VALOR*3 AS VARCHAR(20)) END  
-
 
    IF @NOMBRE_VALOR LIKE '%1%'  
     SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN '  (deuda_cotizaciones > 0 and deuda_cotizaciones <= '+CAST(@UF_VALOR AS VARCHAR(20))+') '  
@@ -236,11 +212,12 @@ set @enviar = 'N'
     SET @sqlfiltro = @sqlfiltro + CASE WHEN @sqlfiltro = '' THEN '  (deuda_cotizaciones > '+CAST(@UF_VALOR*2 AS VARCHAR(20)) +') ' 
              ELSE ' or (deuda_cotizaciones > '+CAST(@UF_VALOR*2 AS VARCHAR(20)) +') '  END  
 
+	--cuando hay tramos
 	if @sqlfiltro <> ''
 	begin 
 		set @sqlfiltro = ' AND ('+@sqlfiltro+') '
 	end
-  
+
    SET @sqlwhere = @sqlwhere + @sqlfiltro  
   END  
   
@@ -401,6 +378,7 @@ set @enviar = 'N'
   --1 18-25, 2 26-40, 3 41 - 55,4 Otros  
   IF @CODIGO_CONCEPTO = 17   
   BEGIN  
+
    IF @NOMBRE_VALOR LIKE '%1%'  
     SET @sqlfiltro = CASE WHEN @sqlfiltro = '' THEN ' ( EDAD_DEUDOR >= 18 and EDAD_DEUDOR <= 25 ) ' ELSE @sqlfiltro + ' OR ( EDAD_DEUDOR >= 18 and EDAD_DEUDOR <= 25 ) ' END  
    IF @NOMBRE_VALOR LIKE '%2%'  
@@ -461,9 +439,10 @@ set @enviar = 'N'
  if object_id('tempdb..#f_gestion29', 'u') is not null drop table #f_gestion29  
  if object_id('tempdb..#f_compromiso_vencido', 'u') is not null drop table #f_compromiso_vencido  
  if object_id('tempdb..#f_deuda_lur_con_credito', 'u') is not null drop table #f_deuda_lur_con_credito  
- if object_id('tempdb..#equipo_cobrador', 'u') is not null drop table #equipo_cobrador 
+ if object_id('tempdb..#equipo_cobrador', 'u') is not null drop table #equipo_cobrador  
  if object_id('tempdb..#email', 'u') is not null drop table #email 
  if object_id('tempdb..#fono', 'u') is not null drop table #fono
+
   
  --#TABLA_FINAL: TABLA DEL RESULTADO FINAL.  
  create table #tabla_final  
@@ -477,7 +456,7 @@ set @enviar = 'N'
   , nombre_ejecutivo varchar(100) null  
   , email_ejecutivo varchar(100) null  
   , fono_ejecutivo varchar(30) null  
-  , url_link varchar(max) null  
+  , url_link varchar(100) null  
   , url_link1 varchar(100) null  
   , url_link2 varchar(100) null  
   , fecha_compromiso datetime null  
@@ -500,8 +479,8 @@ set @enviar = 'N'
   , ip numeric(4) null  
   , menor_per_deuda datetime null  
   , mayor_per_deuda datetime null  
-  , tipo_deudor varchar(30) null  
-  , tipo_empresa varchar(30) null   
+  , tipo_deudor varchar(30) null		--Valores: VIGENTE, NO VIGENTE, EMPRESA
+  , tipo_empresa varchar(30) null		--Valores: COTIZANTE, EMPRESA
   , equipo_cobrador varchar(20) null  
   , cup_correl numeric(15) null
   --, primary key (rut_deudor)  
@@ -975,8 +954,6 @@ declare @sqlfiltrado nvarchar(4000)
 	SELECT *  
 	FROM #tabla_final  
 	where 1 = 1 '+@sqlwhere  
-
-	 PRINT '@sqlfiltrado:'+@sqlfiltrado+'_'
   
 	BEGIN TRY  
 		BEGIN TRANSACTION;  
@@ -998,6 +975,222 @@ declare @sqlfiltrado nvarchar(4000)
 	END CATCH 
 	
 	create nonclustered index ix_tabla_final_filtrada_rut on #tabla_final_filtrada(rut_deudor)
+
+
+set @generar_cupones = 'S'
+
+--GENERAR CUPONES
+IF @generar_cupones = 'S'
+BEGIN
+	DECLARE @usuario_actual NVARCHAR(128);
+	SET @usuario_actual = SYSTEM_USER;
+
+    -- Variables para iterar el cursor y manejar resultados
+    DECLARE @rut_deudor CHAR(10),
+            @tipo_empresa VARCHAR(30),
+            @trama VARCHAR(MAX);
+
+    DECLARE @link NVARCHAR(100),
+            @correl_gescob numeric(15);
+
+    DECLARE @desc_deudanom NUMERIC(10),
+            @desc_reajuste NUMERIC(10),
+            @desc_interes NUMERIC(10),
+            @desc_recargo NUMERIC(10);
+
+    -- Obtener correlativo para 'EMPRESA' que será común
+    DECLARE @tmp_correlativo TABLE (correl_gescob numeric(15));
+
+    INSERT INTO @tmp_correlativo
+    EXECUTE [MIRROR_NT].[AGENCIAS].[DBO].spu_nuevo_correlativo 'CUPONPAGO_COTIZ_DEUDA';
+
+    SELECT TOP 1 @correl_gescob = correl_gescob FROM @tmp_correlativo;
+
+    IF @correl_gescob <= 0 OR @correl_gescob IS NULL
+    BEGIN
+        RAISERROR('Error en la obtención del correlativo para CUPONPAGO_COTIZ_DEUDA', 16, 1);
+        RETURN;
+    END
+
+    -- Crear tabla temporal para acumular resultados con rut_deudor
+    IF OBJECT_ID('tempdb..#tabla_cupones') IS NOT NULL DROP TABLE #tabla_cupones;
+    CREATE TABLE #tabla_cupones (
+        link VARCHAR(MAX),
+        cup_correl numeric(15),
+        rut_deudor CHAR(10)
+    );
+
+    -- Tabla temporal para resultados temporales del SP
+    IF OBJECT_ID('tempdb..#SP_ResultTemp') IS NOT NULL DROP TABLE #SP_ResultTemp;
+    CREATE TABLE #SP_ResultTemp (
+        link VARCHAR(MAX),
+        cup_correl numeric(15)
+    );
+
+    -- Cursor para recorrer los deudores filtrados
+    DECLARE cursor_deudores CURSOR FOR
+        SELECT rut_deudor, tipo_empresa FROM #tabla_final_filtrada;
+
+    OPEN cursor_deudores;
+    FETCH NEXT FROM cursor_deudores INTO @rut_deudor, @tipo_empresa;
+
+    -- Procesamiento por cada fila del cursor
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        IF @tipo_empresa = 'EMPRESA'
+        BEGIN
+            -- Insertar datos en tabla destino
+ 			--SELECT * FROM [MIRROR_NT].[AGENCIAS].[DBO].CUPONPAGO_COTIZ_DEUDA
+			INSERT INTO [MIRROR_NT].[AGENCIAS].[DBO].CUPONPAGO_COTIZ_DEUDA
+					   (CORREL
+					   ,COT_RUT
+					   ,NOM_COTIZANTE
+					   ,EPA_RUT
+					   ,EPA_RAZON
+					   ,DEC_PERIODO
+					   ,DEC_TIPO_DEUDA
+					   ,DEC_NRORESOL
+					   ,PACTADO
+					   ,PAGADO
+					   ,DEUDANOMINAL
+					   ,REAJUSTE
+					   ,INTERES
+					   ,RECARGO
+					   ,TOTAL_APAGAR
+					   ,COBRADOR
+					   ,FECHA
+					   ,ANO
+					   ,MES
+					   ,DEUDA_HC
+					   ,DESCTO_DEUDANOMINAL
+					   ,DESCTO_REAJUSTE
+					   ,DESCTO_INTERES
+					   ,DESCTO_RECARGO
+					   ,FOLIO_FUN_HAB
+					   ,FECHA_FUN_HAB
+					   ,REJ_FOLIO)
+				 --VALUES   (
+				 SELECT
+					   @correl_gescob	--<CORREL, numeric(16,0),>
+					   , tf.rut_deudor	--<COT_RUT, char(10),>
+					   , tf.nombre_deudor	--<NOM_COTIZANTE, varchar(25),>
+					   , tf.rut_deudor	-- DUDA: IGUAL QUE EL COT_RUT??	--<EPA_RUT, char(10),>
+					   , tf.nombre_deudor	-- DUDA: IGUAL QUE EL nombre_deudor??	--<EPA_RAZON, varchar(200),>
+					   , tdc.DEC_PERIODO	--<DEC_PERIODO, datetime,>
+					   , tdc.DEC_TIPO_DEUDA	--<DEC_TIPO_DEUDA, varchar(20),>
+					   , NULL				--<DEC_NRORESOL, numeric(10,0),>
+					   , NULL				--<PACTADO, numeric(10,0),>
+					   , NULL				--<PAGADO, numeric(10,0),>
+					   , NULL				--<DEUDANOMINAL, numeric(10,0),>
+					   , NULL				--<REAJUSTE, numeric(10,0),>
+					   , NULL				--<INTERES, numeric(10,0),>
+					   , NULL				--<RECARGO, numeric(10,0),>
+					   , NULL				--<TOTAL_APAGAR, numeric(10,0),>
+					   , COALESCE(tf.nombre_ejecutivo, nom_cob_lurchq)	--DUDA				--<COBRADOR, varchar(65),>
+					   , NULL				--<FECHA, datetime,>
+					   , NULL				--<ANO, int,>
+					   , NULL				--<MES, int,>
+					   , NULL				--<DEUDA_HC, numeric(10,0),>
+					   , NULL				--<DESCTO_DEUDANOMINAL, numeric(10,0),>
+					   , NULL				--<DESCTO_REAJUSTE, numeric(16,9),>
+					   , NULL				--<DESCTO_INTERES, numeric(16,8),>
+					   , NULL				--<DESCTO_RECARGO, numeric(16,8),>
+					   , NULL				--<FOLIO_FUN_HAB, numeric(10,0),>
+					   , NULL				--<FECHA_FUN_HAB, datetime,>
+					   , NULL				--<REJ_FOLIO, numeric(10,0),>
+					   --)
+				FROM #TMP_DEUDA_COTIZANTE tdc
+				JOIN #tabla_final_filtrada tf ON tdc.DEC_RUT = tf.rut_deudor
+				WHERE tf.rut_deudor = @rut_deudor;
+
+            -- Limpiar temporal para nueva captura de SP
+            TRUNCATE TABLE #SP_ResultTemp;
+
+            -- Ejecutar SP y capturar resultado
+            INSERT INTO #SP_ResultTemp
+            EXEC MIRROR_NT.AGENCIAS.dbo.spu_cuponpago_genera_con_descto_empleador
+                @epa_rut = @rut_deudor,
+                @correl_gescob = @correl_gescob,
+                @desc_deudanom = 0,
+                @desc_reajuste = 0,
+                @desc_interes = 0,
+                @desc_recargo = 0,
+                @usuario = @usuario_actual,
+                @hon_cob = NULL,
+                @valida_lagunas = 'S';
+
+            -- Agregar resultado con rut_deudor a tabla principal
+            INSERT INTO #tabla_cupones (link, cup_correl, rut_deudor)
+            SELECT link, cup_correl, @rut_deudor FROM #SP_ResultTemp;
+
+
+        END
+ /*
+        ELSE
+        BEGIN
+            -- Lógica para otros tipos
+			
+ 
+	-- manejo para otros tipos de deudores
+            SET @trama = '';
+            SELECT @trama = STRING_AGG(
+                CAST(DEC_RUT AS VARCHAR) + '|' +
+                CONVERT(VARCHAR, DEC_PERIODO, 112) + '|' +
+                '2|' +
+                CAST(DEC_DEUDA AS VARCHAR) + '|0|0|0|0|0|0|0',
+                '|')
+            FROM #TMP_DEUDA_COTIZANTE
+            WHERE DEC_RUT = @rut_deudor AND DEC_DEUDA > 0
+            ORDER BY DEC_PERIODO;
+
+            EXEC dbo.spu_cuponpago_genera_con_descto
+                @trama = @trama,
+                @usuario = SYSTEM_USER,		--el usuario no debe ser null para que pase el cup_correl
+                @hon_cob = NULL,
+                @valida_lagunas = 'S';
+
+            SELECT TOP 1 @cup_correl = cup_correl FROM CUPONPAGO_COTIZ WHERE ddr_rut = @rut_deudor ORDER BY cup_fechareg DESC;
+
+            SET @link = 'https://pcotiz.nuevamasvida.cl/?ID=' + CONVERT(VARCHAR, dbo.f_conex_encrip(@cup_correl), 1);
+
+            UPDATE #tabla_final_filtrada
+            SET url_link = @link,
+                monto_cupon = @cup_correl
+            WHERE rut_deudor = @rut_deudor;
+
+
+        END		*/
+
+        -- Siguiente fila del cursor
+        FETCH NEXT FROM cursor_deudores INTO @rut_deudor, @tipo_empresa;
+    END
+
+    CLOSE cursor_deudores;
+    DEALLOCATE cursor_deudores;
+
+
+            ---- Actualizar tabla filtrada con monto y URL del cupón
+            --UPDATE #tabla_final_filtrada
+            --SET monto_cupon = @correl_gescob,
+            --    url_link = (SELECT TOP 1 link FROM #tabla_cupones WHERE rut_deudor = @rut_deudor)
+            --WHERE rut_deudor = @rut_deudor;
+
+
+            -- Actualizar tabla filtrada con monto y URL del cupón
+            UPDATE tf
+            SET cup_correl = tc.cup_correl
+                , url_link = tc.link
+			from #tabla_final_filtrada tf
+			join #tabla_cupones tc
+				on tf.rut_deudor = tc.rut_deudor
+
+
+
+END
+--GENERAR CUPONES
+
+
+
 
 
   
@@ -1043,11 +1236,10 @@ declare @sqlfiltrado nvarchar(4000)
      , mayor_per_deuda   
      , tipo_deudor   
      , tipo_empresa  
-     , equipo_cobrador  
+     , equipo_cobrador
+	 , cup_correl
      FROM #tabla_final_filtrada  
      where 1 = 1 ' 
-
-
   
      BEGIN TRY  
       BEGIN TRANSACTION;  
@@ -1139,8 +1331,4 @@ declare @sqlfiltrado nvarchar(4000)
   
  END  
   
---END
-
-
-
-
+END
