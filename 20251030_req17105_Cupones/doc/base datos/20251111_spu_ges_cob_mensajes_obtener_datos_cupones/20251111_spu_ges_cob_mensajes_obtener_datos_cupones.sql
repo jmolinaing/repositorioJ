@@ -36,7 +36,7 @@ insert into GCO_ENVMSG_PROGRAMA_LOG values(5, @epl_fechora, null)
 execute spu_ges_cob_mensajes_obtener_datos 1, 'S', 5, @epl_fechora  
 
 execute spu_ges_cob_mensajes_obtener_datos 1
-execute spu_ges_cob_mensajes_obtener_datos_cupones 1		--eran 1160 reg aprox en 45 seg aprox, EN TABLA NUEVA:
+execute spu_ges_cob_mensajes_obtener_datos_cupones 1		--eran 1160 reg aprox en 45 seg aprox, EN TABLA NUEVA: 1265 
 
 */  
   
