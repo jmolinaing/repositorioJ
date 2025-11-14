@@ -23,11 +23,14 @@
 /* ======================================================================================== */  
 --CREATE PROCEDURE [dbo].[spu_cuponpago_genera_con_descto_empleador]  
 
---EXECUTE spu_ges_cob_mensajes_generar_cupones '2025-11-11 20:56:13.387'
+
 
 --select 
 --SELECT name FROM sys.sql_logins WHERE name = 'jmolina'
 
+--GRANT EXECUTE ON OBJECT::dbo.spu_ges_cob_mensajes_generar_cupones TO PUBLIC;
+
+--EXECUTE spu_ges_cob_mensajes_generar_cupones '2025-11-14 13:05:52.433'
 
 
 alter PROCEDURE [dbo].[spu_ges_cob_mensajes_generar_cupones]  
@@ -44,10 +47,10 @@ AS
 BEGIN   
  SET NOCOUNT ON;  
 
- print 'hola'
+ --print 'hola'
 
- return 
- /*     
+ --return 
+ --/*     
  DECLARE  
   @sql varchar(2000),  
         @cant_reg  NUMERIC(20),  
@@ -92,7 +95,7 @@ BEGIN
    [GDC_TIPODEUDOR] [char](1) NULL  
   )  
   
-  -- #PM_CUPONPAGO_DETTRAB  
+  -- #PM_CUPONPAGO_DETTRAB								--JMOLINA, NI IDEA , SE DEBERA USAR???
   CREATE TABLE [#pm_cuponpago_dettrab](  
    [PMC_CORREL] [numeric](10, 0) NOT NULL,  
    [PMC_RUT] [char](10) NOT NULL,  
@@ -331,6 +334,7 @@ END
     WHERE CUP_ID_BASE=@cup_id_base  
 
 --JMOLINA, CREE ESTA SECCION V1 PARA REEMPLAZAR LA  SECCION V0 
+--SELECT * FROM [150.10.11.55].[ISAPRE].DBO.GCO_ENVMSG_DEUDA_CUPONES 
 
 
 
@@ -878,6 +882,7 @@ END
   
   select distinct  
     ccd.cup_correl  
+	, PMC_RUT AS RUT		--JMOLINA V1: agregar esta linea
   into #paso_cupones  
   from #pm_cuponpago_det d  
     join cuponpago_cotiz_detalle ccd on d.ppc_folio = ccd.ppc_folio  
@@ -886,7 +891,8 @@ END
   --select * from #paso_cupones    
   
   --select cup_correl, 'https://apps.nuevamasvida.cl/App_Portal_Pago/?ID=' + CONVERT(VARCHAR(MAX), dbo.f_conex_encrip(cup_correl), 1) as link   
-  select cup_correl, 'https://pcotiz.nuevamasvida.cl/?ID=' + CONVERT(VARCHAR(MAX), dbo.f_conex_encrip(cup_correl), 1) as link   
+  --select cup_correl, 'https://pcotiz.nuevamasvida.cl/?ID=' + CONVERT(VARCHAR(MAX), dbo.f_conex_encrip(cup_correl), 1) as link		--JMOLINA V0
+  select cup_correl, 'https://pcotiz.nuevamasvida.cl/?ID=' + CONVERT(VARCHAR(MAX), dbo.f_conex_encrip(cup_correl), 1) as link, RUT		--JMOLINA V1
   into #paso_cupones_link  
   from #paso_cupones  
    
@@ -941,7 +947,7 @@ END
   -- FROM #paso_cupones_link  
 
   -- jmolina v1
-   SELECT link, cup_correl  
+   SELECT link, cup_correl , rut 
    FROM #paso_cupones_link  
 
 
@@ -955,5 +961,5 @@ END
  --END CATCH 
  
 
- */
+ --*/
 END  
