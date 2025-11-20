@@ -20,10 +20,17 @@
 /* FECHA CREACIÓN     : 26/08/2023                                                         */  
 /* DESCRIPCIÓN        : Se agrega el parámetro @hon_cob para indicar un monto fijo de       */  
 /*                      Honorarios de cobranza para el cupón.        */  
-/* ======================================================================================== */  
---CREATE PROCEDURE [dbo].[spu_cuponpago_genera_con_descto_empleador]  
+/* ======================================================================================== */ 
 
 
+/*========================================================================================   
+ tipo de objeto  : procedimiento almacenado                                          
+ nombre del objeto : spu_ges_cob_mensajes_generar_cupones                                                                                                   
+ parametros   : @cup_id_base : fecha con que se guarda los reg. de [isapre].dbo.GCO_ENVMSG_DEUDA_CUPONES                                                                                    
+ creado por   : jorge molina               
+ fecha creación  : 11-2025                                                      
+ descripción  : simil al sp spu_cuponpago_genera_con_descto_empleador  
+ */
 
 --select 
 --SELECT name FROM sys.sql_logins WHERE name = 'jmolina'
