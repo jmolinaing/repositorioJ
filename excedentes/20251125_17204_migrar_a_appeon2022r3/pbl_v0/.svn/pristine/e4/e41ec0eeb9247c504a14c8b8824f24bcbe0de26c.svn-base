@@ -1,0 +1,17 @@
+[User Info]
+UltimoLogin=MREBOLLEDO
+
+[CONNECT]
+Isapre=MASVIDA
+Servidor=EVOLUTION
+;Servidor=EVO-PASO
+;Servidor=srv-nmv-qa01.masvida.cl
+BaseDato=ISAPRE
+EntornoBD=QA
+
+[Instalacion]
+SOURCE=\\mantencion_2000\last_version\excedentes
+ejecutable=Excedentes.exe
+sistema=Excedentes
+VERSION=21/03/2005 14:00:00
+UPDATE=
