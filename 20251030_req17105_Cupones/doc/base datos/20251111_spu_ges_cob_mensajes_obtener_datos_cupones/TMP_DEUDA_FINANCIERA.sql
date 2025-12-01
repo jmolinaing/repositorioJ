@@ -1,0 +1,42 @@
+SELECT   DISTINCT GD.DEU_CORREL AS ID_DEUDA
+                     ,GD.DDR_RUT   AS RUT_DEUDOR
+                     ,D.DDR_NOMBRE AS NOMBRE_DEUDOR
+                     ,TD.TDE_DESCRIPCION AS TIPO_DEUDA
+                     ,cast(ltrim(rtrim(GD.DEU_FOLIODOC)) as varchar(50)) AS FOLIO_DOCUMENTO
+                     ,GD.DEU_FECHA AS FECHA_DEUDA
+                     ,GD.DEU_FECCOBRO AS FECHA_COBRO
+                     ,GD.DEU_MONTO AS MONTO_DEUDA
+                     ,(SELECT COALESCE(SUM(PD.PAD_MONTO),0) FROM GCDF_PAGO_DEUDA PD with (NOLOCK) WHERE PD.DEU_CORREL = GD.DEU_CORREL) AS MONTO_PAGADO
+                     ,(COALESCE(GD.DEU_MONTO,0) - (SELECT COALESCE(SUM(PD.PAD_MONTO ),0) FROM GCDF_PAGO_DEUDA PD with (NOLOCK) WHERE PD.DEU_CORREL = GD.DEU_CORREL) ) AS SALDO
+                     ,GD.DEU_CUOTAS as CANT_CUOTAS
+                     ,(SELECT MAX(PAD_FECHA) FROM GCDF_PAGO_DEUDA with (NOLOCK) WHERE DEU_CORREL=GD.DEU_CORREL) AS FECHA_ULT_PAGO
+                     ,(SELECT MAX(GEC_FECHA_GES) FROM GESTION_COBRANZA with (NOLOCK) WHERE DDR_RUT=GD.DDR_RUT AND TGC_CODIGO IN (80,90)) AS FECHA_ULT_GEST
+                     ,D.DDR_TELEFONO
+                     ,D.DDR_CELULAR
+                     ,D.DDR_EMAIL
+FROM GCDF_DEUDA GD with (NOLOCK)
+       LEFT JOIN DEUDOR D with (NOLOCK) ON GD.DDR_RUT = D.DDR_RUT
+       LEFT JOIN GCDF_TIPO_DEUDA TD with (NOLOCK) ON GD.TDE_CODIGO = TD.TDE_CODIGO    
+       LEFT JOIN GCDF_DEUDOR_ASIGNADO DA on DA.DDR_RUT=GD.DDR_RUT AND DA.DEU_ASIG_DESDE <= GETDATE() AND (DA.DEU_ASIG_HASTA >= CONVERT(CHAR(8),GETDATE(),112) OR DA.DEU_ASIG_HASTA IS NULL)
+
+
+create table #TMP_DEUDA_FINANCIERA  
+ (
+ ID_DEUDA numeric(10) not null
+ , RUT_DEUDOR char(10) not null  
+ , NOMBRE_DEUDOR varchar(250) null 
+ , TIPO_DEUDA varCHAR(50)  null
+ , FOLIO_DOCUMENTO varchar(50) null
+ , FECHA_DEUDA datetime null
+ , FECHA_COBRO datetime null
+ , MONTO_DEUDA numeric(10) null
+ , MONTO_PAGADO numeric(10) null 
+ , SALDO numeric(10) null
+ , CANT_CUOTAS numeric(5) null
+ , FECHA_ULT_PAGO datetime null
+ , FECHA_ULT_GEST datetime null
+ , DDR_TELEFONO char(50) null
+ , DDR_CELULAR varchar(50) null
+ , DDR_EMAIL varchar(50) null  
+ ) 
+
