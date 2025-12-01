@@ -548,7 +548,6 @@ set @getdate = getdate()
 
  
   
-  
  --1.-   
  IF @TipoDeudaCOTIZ = 'SI'  
  BEGIN   
@@ -618,10 +617,6 @@ set @getdate = getdate()
  , deuda_chq numeric(15) null  
  )  
 
-  --nuevo
-  --drop table #TMP_DEUDA_FINANCIERA
-  --delete #TMP_DEUDA_FINANCIERA
-  --delete #origen_lur_chq
 
  create table #TMP_DEUDA_FINANCIERA  
  (
@@ -692,28 +687,8 @@ set @getdate = getdate()
            LEFT JOIN GCDF_TIPO_DEUDA TD with (NOLOCK) ON GD.TDE_CODIGO = TD.TDE_CODIGO    
            LEFT JOIN GCDF_DEUDOR_ASIGNADO DA on DA.DDR_RUT=GD.DDR_RUT AND DA.DEU_ASIG_DESDE <= GETDATE() AND (DA.DEU_ASIG_HASTA >= CONVERT(CHAR(8),GETDATE(),112) OR DA.DEU_ASIG_HASTA IS NULL)
 
-
-
---v0
- --  INSERT #origen_lur_chq  
- --  --11.769
- --  select  
- --    DDR_rut as rut--,  
- --    --sum(case when TDE_CODIGO = 1 then deu_monto else 0 end) as deuda_lur,  
- --    --sum(case when TDE_CODIGO = 2 then deu_monto else 0 end) as deuda_chq  
- ----    case when @TipoDeudaLUR = 'SI' then sum(case when TDE_CODIGO = 1 then deu_monto else 0 end) else null end as deuda_lur,  
- -- --   case when @TipoDeudaCHQ = 'SI' then sum(case when TDE_CODIGO = 2 then deu_monto else 0 end) else null end as deuda_chq    
- --  from dbo.GCDF_DEUDA gd with (nolock)  
- --  where deu_monto > 0  
- --  and TDE_CODIGO in (1, 2)  
- --  group by DDR_rut  
+    CREATE INDEX ix_TMP_DEUDA_FINANCIERA ON #TMP_DEUDA_FINANCIERA(RUT_DEUDOR)  
   
-   create nonclustered index ix_origen_chq_rut on #origen_lur_chq (rut)  
-   --prueba
-    declare @TipoDeudaLUR varchar(2)
-    declare @TipoDeudaCHQ varchar(2)
-    set @TipoDeudaCHQ = 'SI'        --prueba
-
    INSERT #origen_lur_chq  
    select  
      RUT_DEUDOR as rut  
@@ -724,10 +699,6 @@ set @getdate = getdate()
    and TDE_CODIGO in (1, 2)  
    group by RUT_DEUDOR 
    
-    --  --prueba
-    --declare @TipoDeudaLUR varchar(2)
-    --declare @TipoDeudaCHQ varchar(2)
-    --set @TipoDeudaLUR = 'SI'        --prueba
      if @TipoDeudaLUR = 'SI'  
      begin 
             delete #origen_lur_chq where deuda_lur = 0 
@@ -738,6 +709,7 @@ set @getdate = getdate()
             delete #origen_lur_chq where deuda_chq = 0 
      end
 
+   create nonclustered index ix_origen_chq_rut on #origen_lur_chq (rut) 
 
  --  select * from #TMP_DEUDA_FINANCIERA where rut_deudor = ' 76329269K'
  --  select * from #origen_lur_chq
@@ -1280,6 +1252,7 @@ BEGIN
 
     END     --IF @TipoDeudaCOTIZ = 'SI'
 
+
     IF @TipoDeudaLUR = 'SI' OR @TipoDeudaCHQ = 'SI'   
     BEGIN
 
@@ -1287,52 +1260,28 @@ BEGIN
             
                 BEGIN TRANSACTION
 /*
-			        --insert GCO_ENVMSG_DEUDA_CUPONES
+			        --insert GCO_ENVMSG_DEUDA_CUPONES_DEUFIN
 			        BEGIN TRY
 
-					        INSERT INTO dbo.GCO_ENVMSG_DEUDA_CUPONES
+					        INSERT INTO dbo.GCO_ENVMSG_DEUDA_CUPONES_DEUFIN
 							           (CUP_ID_BASE
 							           ,COT_RUT
-							           ,NOM_COTIZANTE
-							           ,EPA_RUT
-							           ,EPA_RAZON
-							           ,DEC_PERIODO
-							           ,DEC_TIPO_DEUDA
-							           ,PACTADO
-							           ,PAGADO
-							           ,DEUDANOMINAL
-							           ,REAJUSTE
-							           ,INTERES
-							           ,RECARGO
-							           ,TOTAL_APAGAR
-							           ,DESCTO_DEUDANOMINAL
-							           ,DESCTO_REAJUSTE
-							           ,DESCTO_INTERES
-							           ,DESCTO_RECARGO)
+							           ,NOM_DEUDOR      --VARCHAR(200) NULL   
+							           ,DEU_CORREL      --NUMERIC(15) NULL 
+							           ,DEU_MONTO       --NUMERIC(15) NULL 
+							           ,DEU_DESCUENTO   --NUMERIC(15) NULL 
+                                       )
 					        select
 						        @getdate		--(<CUP_ID_BASE, datetime,>
 						        , tdc.COT_RUT	--,<COT_RUT, char(10),>
-						        , SUBSTRING((COALESCE(rtrim(COT_NOMBRES),'') + ' '+ COALESCE(rtrim(COT_PATERNO),'') + ' '+COALESCE(rtrim(COT_MATERNO),'')), 1, 24)  -- ,<NOM_COTIZANTE, varchar(25),>
+						        , SUBSTRING((COALESCE(rtrim(COT_NOMBRES),'') + ' '+ COALESCE(rtrim(COT_PATERNO),'') + ' '+COALESCE(rtrim(COT_MATERNO),'')), 1, 200)  -- ,<NOM_COTIZANTE, varchar(25),>
 						        , tdc.DEC_RUT						--   ,<EPA_RUT, char(10),>				--OBLIGATORIO EN EL OTRO SP spu_ges_cob_mensajes_generar_cupones
 						        , SUBSTRING(EP.EPA_RAZON, 1, 200)	--   ,<EPA_RAZON, varchar(200),>
 						        , tdc.DEC_PERIODO					--,<DEC_PERIODO, datetime,>
-						        , tdc.DEC_TIPO_DEUDA				--   ,<DEC_TIPO_DEUDA, varchar(20),>
-						        , 0			--   ,<PACTADO, numeric(10,0),>
-						        , 0			--   ,<PAGADO, numeric(10,0),>
-						        , tdc.DEC_DEUDA		--   ,<DEUDANOMINAL, numeric(10,0),>					--OBLIGATORIO EN EL OTRO SP spu_ges_cob_mensajes_generar_cupones
-						        , 0			--   ,<REAJUSTE, numeric(10,0),>
-						        , 0			--   ,<INTERES, numeric(10,0),>
-						        , 0			--   ,<RECARGO, numeric(10,0),>
-						        , tdc.DEC_DEUDA			--   ,<TOTAL_APAGAR, numeric(10,0),>
-						        , 0			--   ,<DESCTO_DEUDANOMINAL, numeric(10,0),>
-						        , 0			--   ,<DESCTO_REAJUSTE, numeric(10,0),>
-						        , 0			--   ,<DESCTO_INTERES, numeric(10,0),>
-						        , 0			--   ,<DESCTO_RECARGO, numeric(10,0),>)
-					        FROM #TMP_DEUDA_COTIZANTE tdc
-					        join #tabla_final_filtrada tf on tdc.dec_rut = tf.rut_deudor
-					        left join dbo.cotizante ct with (nolock)  on ct.cot_rut = tdc.cot_rut
-					        left join dbo.entidad_pagadora ep (nolock) on ep.epa_rut = tdc.dec_rut
-																        and ep.epa_correl =  (select max(e.epa_correl) from dbo.entidad_pagadora e (nolock) where e.epa_rut = ep.epa_rut)
+					        FROM #TMP_DEUDA_FINANCIERA tdf
+					        join #tabla_final_filtrada tf on tdf.RUT_DEUDOR = tf.rut_deudor
+					        left join dbo.cotizante ct with (nolock)  on ct.cot_rut = tdf.RUT_DEUDOR
+
 
                             -- Nuevo Validar que se hayan insertado filas
                             IF @@ROWCOUNT = 0
