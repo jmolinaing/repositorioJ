@@ -455,6 +455,13 @@ set @getdate = getdate()
   RAISERROR('No existe filtros @sqlwhere en la plantilla: %s', 16, 1, @epl_codigo)  
   RETURN  
  END  
+
+ IF @TipoDeudaCOTIZ = '' and @TipoDeudaLUR = '' and @TipoDeudaCHQ = ''  
+ BEGIN  
+  RAISERROR('Falta Tipo de Deuda en la plantilla: %s', 16, 1, @epl_codigo)  
+  RETURN  
+ END 
+
   
   
  -- SECCION CREACION DEL WHERE. TERMINO__________  
@@ -1259,25 +1266,25 @@ BEGIN
             BEGIN TRY
             
                 BEGIN TRANSACTION
-/*
+
 			        --insert GCO_ENVMSG_DEUDA_CUPONES_DEUFIN
 			        BEGIN TRY
-
+							--Tabla de paso	
 					        INSERT INTO dbo.GCO_ENVMSG_DEUDA_CUPONES_DEUFIN
 							           (CUP_ID_BASE
 							           ,COT_RUT
 							           ,NOM_DEUDOR      --VARCHAR(200) NULL   
 							           ,DEU_CORREL      --NUMERIC(15) NULL 
-							           ,DEU_MONTO       --NUMERIC(15) NULL 
+							           ,DEU_MONTO       --NUMERIC(15) NULL -- MONTO_DEUDA
 							           ,DEU_DESCUENTO   --NUMERIC(15) NULL 
                                        )
 					        select
-						        @getdate		--(<CUP_ID_BASE, datetime,>
-						        , tdc.COT_RUT	--,<COT_RUT, char(10),>
-						        , SUBSTRING((COALESCE(rtrim(COT_NOMBRES),'') + ' '+ COALESCE(rtrim(COT_PATERNO),'') + ' '+COALESCE(rtrim(COT_MATERNO),'')), 1, 200)  -- ,<NOM_COTIZANTE, varchar(25),>
-						        , tdc.DEC_RUT						--   ,<EPA_RUT, char(10),>				--OBLIGATORIO EN EL OTRO SP spu_ges_cob_mensajes_generar_cupones
-						        , SUBSTRING(EP.EPA_RAZON, 1, 200)	--   ,<EPA_RAZON, varchar(200),>
-						        , tdc.DEC_PERIODO					--,<DEC_PERIODO, datetime,>
+						        @getdate		
+						        , tdf.RUT_DEUDOR	
+						        , SUBSTRING((COALESCE(rtrim(COT_NOMBRES),'') + ' '+ COALESCE(rtrim(COT_PATERNO),'') + ' '+COALESCE(rtrim(COT_MATERNO),'')), 1, 200)  
+						        , tdf.ID_DEUDA		
+						        , tdf.MONTO_DEUDA	
+						        , 0		-- Marcelo: 0 por el momento
 					        FROM #TMP_DEUDA_FINANCIERA tdf
 					        join #tabla_final_filtrada tf on tdf.RUT_DEUDOR = tf.rut_deudor
 					        left join dbo.cotizante ct with (nolock)  on ct.cot_rut = tdf.RUT_DEUDOR
@@ -1289,7 +1296,7 @@ BEGIN
                                 IF @@TRANCOUNT > 0
                                     ROLLBACK TRANSACTION;
 
-                                RAISERROR('No se insertó ningún registro en GCO_ENVMSG_DEUDA_CUPONES.', 16, 1);
+                                RAISERROR('No se insertó ningún registro en GCO_ENVMSG_DEUDA_CUPONES_DEUFIN.', 16, 1);
                                 RETURN;
                             END
 
@@ -1299,32 +1306,41 @@ BEGIN
 							        ROLLBACK TRANSACTION;
 
 							        SELECT @ErrorMessage = ERROR_MESSAGE()
-							        RAISERROR('Fallo el INSERT en GCO_ENVMSG_DEUDA_CUPONES: %s', 16, 1, @ErrorMessage)
+							        RAISERROR('Fallo el INSERT en GCO_ENVMSG_DEUDA_CUPONES_DEUFIN: %s', 16, 1, @ErrorMessage)
 							        RETURN
 					        END CATCH
-			        --insert GCO_ENVMSG_DEUDA_CUPONES
+			        --insert GCO_ENVMSG_DEUDA_CUPONES_DEUFIN
+
+
 
 
 			        BEGIN TRY
-					        INSERT into #tabla_cupones (link, cup_correl, rut_deudor)
-					        EXECUTE [MIRROR_NT].[AGENCIAS].[DBO].spu_ges_cob_mensajes_generar_cupones  @getdate;	--'2025-11-14 13:05:52.433'
 
-					         IF NOT EXISTS (  
-					           SELECT 1   
-					           FROM #tabla_cupones WITH (NOLOCK)    
-					         )  
-					         BEGIN  
-						        ROLLBACK TRANSACTION;
-						        RAISERROR('El proceso No generó cupones.', 16, 1)  
-						        RETURN  
-					         END
+							--prueba
+							select * from GCO_ENVMSG_DEUDA_CUPONES_DEUFIN
+							 COMMIT TRANSACTION;
+							return 
+
+
+					        --INSERT into #tabla_cupones (link, cup_correl, rut_deudor)
+					        --EXECUTE [MIRROR_NT].[AGENCIAS].[DBO].spu_ges_cob_mensajes_generar_cupones_deufin  @getdate;	--'2025-11-14 13:05:52.433'
+
+					        -- IF NOT EXISTS (  
+					        --   SELECT 1   
+					        --   FROM #tabla_cupones WITH (NOLOCK)    
+					        -- )  
+					        -- BEGIN  
+						       -- ROLLBACK TRANSACTION;
+						       -- RAISERROR('El proceso No generó cupones.', 16, 1)  
+						       -- RETURN  
+					        -- END
 
 			        END TRY
 					        BEGIN CATCH
 						        IF @@TRANCOUNT > 0
 							        ROLLBACK TRANSACTION;
 							        SELECT @ErrorMessage = ERROR_MESSAGE()
-							        RAISERROR('Fallo la generación de cupones con el SP spu_ges_cob_mensajes_generar_cupones: %s', 16, 1, @ErrorMessage)
+							        RAISERROR('Fallo la generación de cupones con el SP spu_ges_cob_mensajes_generar_cupones_deufin: %s', 16, 1, @ErrorMessage)
 							        RETURN
 					        END CATCH
 
@@ -1342,12 +1358,12 @@ BEGIN
 						        IF @@TRANCOUNT > 0
 							        ROLLBACK TRANSACTION;
 							        SELECT @ErrorMessage = ERROR_MESSAGE()
-							        RAISERROR('La actualización de cup_correl y url_link falló: %s', 16, 1, @ErrorMessage)
+							        RAISERROR('DEUDA FINANCIERA: La actualización de cup_correl y url_link falló: %s', 16, 1, @ErrorMessage)
 							        RETURN
 					        END CATCH
 
 		        COMMIT TRANSACTION;
-                */
+                
             END TRY
             BEGIN CATCH
                 IF @@TRANCOUNT > 0
