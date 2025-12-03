@@ -1316,24 +1316,24 @@ BEGIN
 
 			        BEGIN TRY
 
-							--prueba
-							select * from GCO_ENVMSG_DEUDA_CUPONES_DEUFIN
-							 COMMIT TRANSACTION;
-							return 
+							----prueba
+							--select * from GCO_ENVMSG_DEUDA_CUPONES_DEUFIN
+							-- COMMIT TRANSACTION;
+							--return 
 
 
-					        --INSERT into #tabla_cupones (link, cup_correl, rut_deudor)
-					        --EXECUTE [MIRROR_NT].[AGENCIAS].[DBO].spu_ges_cob_mensajes_generar_cupones_deufin  @getdate;	--'2025-11-14 13:05:52.433'
+					        INSERT into #tabla_cupones (link, cup_correl, rut_deudor)
+					        EXECUTE [MIRROR_NT].[AGENCIAS].[DBO].spu_ges_cob_mensajes_generar_cupones_deufin  @getdate;	--'2025-11-14 13:05:52.433'
 
-					        -- IF NOT EXISTS (  
-					        --   SELECT 1   
-					        --   FROM #tabla_cupones WITH (NOLOCK)    
-					        -- )  
-					        -- BEGIN  
-						       -- ROLLBACK TRANSACTION;
-						       -- RAISERROR('El proceso No generó cupones.', 16, 1)  
-						       -- RETURN  
-					        -- END
+					         IF NOT EXISTS (  
+					           SELECT 1   
+					           FROM #tabla_cupones WITH (NOLOCK)    
+					         )  
+					         BEGIN  
+						        ROLLBACK TRANSACTION;
+						        RAISERROR('El proceso No generó cupones.', 16, 1)  
+						        RETURN  
+					         END
 
 			        END TRY
 					        BEGIN CATCH
@@ -1539,8 +1539,17 @@ END
 		BEGIN TRY  
 			BEGIN TRANSACTION;  
 
-			DELETE DBO.GCO_ENVMSG_DEUDA_CUPONES 
-			WHERE CUP_ID_BASE < DATEADD(D,-3 , GETDATE())
+			IF @TipoDeudaCOTIZ = 'SI'   
+			BEGIN
+				DELETE DBO.GCO_ENVMSG_DEUDA_CUPONES 
+				WHERE CUP_ID_BASE < DATEADD(D,-3 , GETDATE())
+			END
+
+			IF @TipoDeudaLUR = 'SI' OR @TipoDeudaCHQ = 'SI'   
+			BEGIN
+				DELETE DBO.GCO_ENVMSG_DEUDA_CUPONES_DEUFIN 
+				WHERE CUP_ID_BASE < DATEADD(D,-3 , GETDATE())
+			END
 
 			COMMIT TRANSACTION;  
 		END TRY  
