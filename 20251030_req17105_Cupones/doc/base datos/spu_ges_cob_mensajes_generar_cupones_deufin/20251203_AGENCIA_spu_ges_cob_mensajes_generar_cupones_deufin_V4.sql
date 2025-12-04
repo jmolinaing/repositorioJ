@@ -13,23 +13,13 @@
  */     
 --GRANT EXECUTE ON OBJECT::dbo.spu_ges_cob_mensajes_generar_cupones_deufin TO PUBLIC;
 /* 
+--EJERCICIO1
 EXECUTE spu_ges_cob_mensajes_generar_cupones_deufin '2025-12-02 19:42:27.327'
 
-SELECT * FROM dbo.CUPONPAGO_DEUFIN    
-SELECT * FROM dbo.CUPONPAGO_DEUFIN_DETALLE 
-select * FROM [evolution].[ISAPRE].DBO.GCO_ENVMSG_DEUDA_CUPONES_DEUFIN where cup_id_base = '2025-12-02 19:42:27.327'
-
-SELECT * FROM dbo.CUPONPAGO_DEUFIN    
-SELECT * FROM dbo.CUPONPAGO_DEUFIN_DETALLE
-
---10.052 REG
-select * FROM [evolution].[ISAPRE].DBO.GCO_ENVMSG_DEUDA_CUPONES_DEUFIN where cup_id_base = '2025-12-03 18:28:24.600'
-
-SELECT * FROM dbo.CUPONPAGO_DEUFIN_DETALLE D
-LEFT JOIN [evolution].[ISAPRE].DBO.GCO_ENVMSG_DEUDA_CUPONES_DEUFIN G 
-	ON D.DEU_CORREL = G.DEU_CORREL
-where cup_id_base = '2025-12-03 18:28:24.600'
-AND USU_LOGIN = 'JMOLINA                                           '
+--REVISION EJERCICIO1
+SELECT * FROM dbo.CUPONPAGO_DEUFIN where cup_fechareg = '2025-12-04 12:35:21.207'   
+SELECT * FROM dbo.CUPONPAGO_DEUFIN_DETALLE where cup_correl in (SELECT cup_correl FROM dbo.CUPONPAGO_DEUFIN where cup_fechareg = '2025-12-04 12:35:21.207' )
+select * FROM [evolution].[ISAPRE].DBO.GCO_ENVMSG_DEUDA_CUPONES_DEUFIN where cup_id_base = '2025-12-04 12:35:21.207'
 
 */    
 
@@ -136,7 +126,7 @@ BEGIN
 			   , CUP_FECHAPAGO
 			   , CUP_CORREL)     
 			SELECT DISTINCT SYSTEM_USER     
-				, @FECHA_HOY     
+				, @cup_id_base		--@FECHA_HOY     
 				, COT_RUT
 				, SUBSTRING(NOM_DEUDOR, 1, 100) 
 				, NULL
@@ -189,23 +179,14 @@ BEGIN
 				, CUP_FECHAPAGO
 			FROM #DEUDA_CUPONES_DEUFIN_AGRUPADA
 
-			SET @OPERACION = 'UPDATE #DEUDA_CUPONES_DEUFIN_DETALLE'
-			--UPDATE #DEUDA_CUPONES_DEUFIN_DETALLE
-			--SET CUP_CORREL = TMP.CUP_CORREL
-			--FROM #TMP_CUPONPAGO_DEUFIN TMP
-			--WHERE TMP.DDR_RUT = #DEUDA_CUPONES_DEUFIN_DETALLE.COT_RUT
 
+			SET @OPERACION = 'UPDATE #DEUDA_CUPONES_DEUFIN_DETALLE'
 			UPDATE DC
 			SET CUP_CORREL = TMP.CUP_CORREL
 			FROM #DEUDA_CUPONES_DEUFIN_DETALLE DC
 			JOIN #TMP_CUPONPAGO_DEUFIN TMP
 				ON TMP.DDR_RUT = DC.COT_RUT
 
-			--SELECT * FROM #DEUDA_CUPONES_DEUFIN_AGRUPADA
-			--SELECT * FROM #DEUDA_CUPONES_DEUFIN_DETALLE
-			--select * from #cup_correl
-			--select * from #tmp_CUPONPAGO_DEUFIN
-			--SELECT * FROM #DEUDA_CUPONES_DEUFIN_DETALLE
 
 			SET @OPERACION = 'INSERT CUPONPAGO_DEUFIN'
 			INSERT INTO dbo.CUPONPAGO_DEUFIN    
@@ -217,7 +198,7 @@ BEGIN
 			   , CUP_FECHAPAGO
 			   )     
 			SELECT CUP_CORREL     
-				, USU_LOGIN     
+				, 'SYSTEM'	--USU_LOGIN     
 				, CUP_FECHAREG     
 				, DDR_RUT
 				, DDR_NOMBRE  
@@ -280,12 +261,12 @@ BEGIN
 				@ErrorMessage   NVARCHAR(4000) = ERROR_MESSAGE(),	-- Texto completo del mensaje de error con detalles (columnas, valores, etc.)
 				@MensajeFinal   NVARCHAR(4000)
 
-			SET @MensajeFinal = 'Error en el proceso: ' + ISNULL(@OPERACION, '') + 
+			SET @MensajeFinal = 'Error Proceso: ' + ISNULL(@OPERACION, '') + 
                    ' . Nº: ' + CAST(@ErrorNumber AS VARCHAR(10)) + 
-                   ', Proc: ' + ISNULL(@ErrorProcedure, '') + 
+                   ', Sp_trigger_funcion: ' + ISNULL(@ErrorProcedure, '') + 
                    ', Línea: ' + CAST(@ErrorLine AS VARCHAR(10)) +
 				   ', Línea: ' + ISNULL(@ErrorProcedure, '') +
-                   ', Detalle: ' + ISNULL(@ErrorMessage, '');
+                   ', Detalle error: ' + ISNULL(@ErrorMessage, '');
 
 			RAISERROR(@MensajeFinal, 16, 1);
 			RETURN;

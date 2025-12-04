@@ -25,7 +25,7 @@ alter PROCEDURE [dbo].[spu_ges_cob_mensajes_generar_cupones]
 AS  
 BEGIN   
  SET NOCOUNT ON; 
- SET XACT_ABORT ON
+ --SET XACT_ABORT ON
   
  DECLARE  
   @sql varchar(2000),  
