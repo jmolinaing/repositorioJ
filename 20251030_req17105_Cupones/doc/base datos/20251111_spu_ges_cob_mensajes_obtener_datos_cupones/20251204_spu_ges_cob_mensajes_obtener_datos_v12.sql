@@ -35,26 +35,65 @@
 /*   
 GRANT EXECUTE ON [spu_ges_cob_mensajes_obtener_datos] TO public;  
 
---EJERCICIO1: SOLO CONSULTA DE DATOS
-execute spu_ges_cob_mensajes_obtener_datos 1, 'N', NULL, NULL, 'N'		--eran 1160 reg aprox en 45 seg aprox, EN TABLA NUEVA: 1265 
+--DEUDA COTIZACIONES________________________________________________________________________
+--EJ1: Plantilla:10, Filtros: Deuda cotizaciones y grupo cobrador interno , SOLO CONSULTA
+execute spu_ges_cob_mensajes_obtener_datos 10, 'N', NULL, NULL, 'N'		--5884 REG, 1,26MIN 
 
---EJERCICIO2: ENVIO DE DATOS Y GENERAR CUPONES
+--EJ2: Plantilla:10, Filtros: Deuda cotizaciones y grupo INTERNO , OPCION ENVIAR(se necesita cod de programa:@epr_codigo y @epl_fechora de GCO_ENVMSG_PROGRAMA_LOG)
 declare @epl_fechora datetime
-SET @epl_fechora = '20251204'
---insert into GCO_ENVMSG_PROGRAMA_LOG values(1, @epl_fechora, null)  
-execute spu_ges_cob_mensajes_obtener_datos_x 1, 'n', 1, @epl_fechora , 'S' 
+declare @epr_codigo integer
+SET @epl_fechora = '20251205'
+SET @epr_codigo = 1
+insert into GCO_ENVMSG_PROGRAMA_LOG values(@epr_codigo, @epl_fechora, null) 
+execute spu_ges_cob_mensajes_obtener_datos 10, 'S', @epr_codigo, @epl_fechora, 'N'		--5884 REG, 1,26MIN 
 
---EJERCICIO3: LUR, CUPONES LUR
-execute spu_ges_cob_mensajes_obtener_datos 3    --6.037, 25SEG
+REVISION EJ2: select * from GCO_ENVMSG_MENSAJE where eme_fechareg = '2025-12-05 16:08:38.790'	--5884 REG OK 
 
---EJERCICIO: PLANTILLA3 SOLO DEUDA LUR, Y GENERACION DE CUPONES
+--EJ3: Plantilla:10, Filtros: Deuda cotizaciones y grupo cobrador interno , SOLO GENERACION DE CUPONES
+execute spu_ges_cob_mensajes_obtener_datos 10, 'N', NULL, NULL, 'S'		--5884 REG, 1,35MIN con su url_link y cup_correl OK
+
+
+--DEUDA LUR________________________________________________________________________
+--EJ1: Plantilla:20, Filtros: Deuda LUR, SOLO CONSULTA
+execute spu_ges_cob_mensajes_obtener_datos 20, 'N', NULL, NULL, 'N'		--4577 REG, 1MIN 
+
+--EJ2: Plantilla:20, Filtros: Deuda LUR , OPCION ENVIAR(se necesita cod de programa:@epr_codigo y @epl_fechora de GCO_ENVMSG_PROGRAMA_LOG)
 declare @epl_fechora datetime
-SET @epl_fechora = '20251120'  
---insert into GCO_ENVMSG_PROGRAMA_LOG values(1, @epl_fechora, null)  
-execute spu_ges_cob_mensajes_obtener_datos_X 3, 'N', NULL, NULL, 'S'
+declare @epr_codigo integer
+SET @epl_fechora = '20251205'
+SET @epr_codigo = 2
+--hay que crear el registro GCO_ENVMSG_PROGRAMA via la aplicación
+insert into GCO_ENVMSG_PROGRAMA_LOG values(@epr_codigo, @epl_fechora, null) 
+execute spu_ges_cob_mensajes_obtener_datos 20, 'S', @epr_codigo, @epl_fechora, 'N'		--4577 REG, 1,26MIN 
+
+REVISION EJ2: select * from GCO_ENVMSG_MENSAJE where eme_fechareg = '2025-12-05 16:34:23.890'	--4577 REG OK 
+
+--EJ3: Plantilla:20, Filtros: , SOLO GENERACION DE CUPONES
+execute spu_ges_cob_mensajes_obtener_datos 20, 'N', NULL, NULL, 'S'		--4577 REG, 1,35MIN con su url_link y cup_correl OK
+
+
+
+--DEUDA CHQ________________________________________________________________________
+--EJ1: Plantilla:30, Filtros: Deuda CHQ, SOLO CONSULTA
+execute spu_ges_cob_mensajes_obtener_datos 30, 'N', NULL, NULL, 'N'		--945 REG, 20SEG 
+
+--EJ2: Plantilla:30, Filtros: Deuda CHQ, OPCION ENVIAR(se necesita cod de programa:@epr_codigo y @epl_fechora de GCO_ENVMSG_PROGRAMA_LOG)
+declare @epl_fechora datetime
+declare @epr_codigo integer
+SET @epl_fechora = '20251205'
+SET @epr_codigo = 3
+--hay que crear el registro GCO_ENVMSG_PROGRAMA via la aplicación
+insert into GCO_ENVMSG_PROGRAMA_LOG values(@epr_codigo, @epl_fechora, null) 
+execute spu_ges_cob_mensajes_obtener_datos 30, 'S', @epr_codigo, @epl_fechora, 'N'
+
+REVISION EJ2: select * from GCO_ENVMSG_MENSAJE where eme_fechareg = '2025-12-05 16:39:19.630'	--945 REG OK 
+
+--EJ3: Plantilla:30, Filtros: , SOLO GENERACION DE CUPONES
+execute spu_ges_cob_mensajes_obtener_datos 30, 'N', NULL, NULL, 'S'		--945 REG, 19SEG con su url_link y cup_correl OK
+
 */  
   
-ALTER procedure [dbo].[spu_ges_cob_mensajes_obtener_datos_X]   
+ALTER procedure [dbo].[spu_ges_cob_mensajes_obtener_datos]   
 @epl_codigo varchar(50) = null  
 , @enviar char(1) = 'N'  
 , @epr_codigo numeric(10) = null  
@@ -129,7 +168,21 @@ set @getdate = getdate()
    begin   
       RAISERROR('Falta código de programa(@epr_codigo)', 16, 1)  
       RETURN  
-   end  
+   end
+   else
+   begin
+		--revisar si es codigo de programa @epr_codigo esta vinculado a la plantilla @epl_codigo
+		  IF NOT EXISTS (  
+		   SELECT 1   
+		   FROM dbo.GCO_ENVMSG_PROGRAMA WITH (NOLOCK)   
+		   WHERE epr_codigo = @epr_codigo  and epl_codigo = @epl_codigo
+			 )  
+			 BEGIN  
+			   RAISERROR('No existe registro en GCO_ENVMSG_PROGRAMA con los parámetros codigo de programa: @epr_codigo y codigo plantilla:@epl_codigo', 16, 1)  
+			   RETURN  
+			 END 
+
+   end
 
    select @ate_codigo =  ate_codigo from GCO_ENVMSG_PROGRAMA with (nolock) where epr_codigo = @epr_codigo  
   
@@ -161,9 +214,24 @@ set @getdate = getdate()
    WHERE epr_codigo = @epr_codigo  and epl_fechora = @epl_fechora
 	 )  
 	 BEGIN  
-	   RAISERROR('No existe registro en GCO_ENVMSG_PROGRAMA_LOG conlos parámetros @epr_codigo y @epl_fechora', 16, 1)  
+	   RAISERROR('No existe registro en GCO_ENVMSG_PROGRAMA_LOG con los parámetros @epr_codigo y @epl_fechora', 16, 1)  
 	   RETURN  
 	 END  
+
+
+   --revisar @epr_codigo y @epl_fechora existan como registro en GCO_ENVMSG_PROGRAMA_LOG Y ESTEN VINCULADOS A LA PLANTILLA DE LA TABLA GCO_ENVMSG_PROGRAMA
+   IF NOT EXISTS (  
+   SELECT 1   
+   FROM dbo.GCO_ENVMSG_PROGRAMA_LOG l WITH (NOLOCK)
+   join dbo.GCO_ENVMSG_PROGRAMA p WITH (NOLOCK)
+   on l.EPR_CODIGO = p.EPR_CODIGO
+   WHERE l.epr_codigo = @epr_codigo  and l.epl_fechora = @epl_fechora and p.epl_codigo = @epl_codigo
+	 )  
+	 BEGIN  
+	   RAISERROR('No existe registro en GCO_ENVMSG_PROGRAMA_LOG con los parámetros @epr_codigo y @epl_fechora vinculados con el codigo plantilla:@epl_codigo', 16, 1)  
+	   RETURN  
+	 END 
+
 
   
   end  
@@ -442,10 +510,10 @@ set @getdate = getdate()
  DEALLOCATE CUR_FILTROS  
   
  ----prueba_  
- --PRINT 'WHERE:_'+@sqlwhere+'_'  
- --PRINT 'TipoDeudaCOTIZ:_'+@TipoDeudaCOTIZ+'_'  
- --PRINT 'TipoDeudaLUR:_'+@TipoDeudaLUR+'_'  
- --PRINT 'TipoDeudaCHQ:_'+@TipoDeudaCHQ+'_'  
+ PRINT 'WHERE:_'+@sqlwhere+'_'  
+ PRINT 'TipoDeudaCOTIZ:_'+@TipoDeudaCOTIZ+'_'  
+ PRINT 'TipoDeudaLUR:_'+@TipoDeudaLUR+'_'  
+ PRINT 'TipoDeudaCHQ:_'+@TipoDeudaCHQ+'_'  
  --set @sqlwhere = ''  
  ----prueba_  
   
@@ -765,7 +833,7 @@ set @getdate = getdate()
  
  IF @@ROWCOUNT = 0
 BEGIN  
-    ROLLBACK TRANSACTION;
+   -- ROLLBACK TRANSACTION;
     RAISERROR('Proceso detenido por falta de registros en #tabla_final .', 16, 1);  
     RETURN;  
 END
@@ -1214,6 +1282,7 @@ BEGIN
 					        left join dbo.cotizante ct with (nolock)  on ct.cot_rut = tdc.cot_rut
 					        left join dbo.entidad_pagadora ep (nolock) on ep.epa_rut = tdc.dec_rut
 																        and ep.epa_correl =  (select max(e.epa_correl) from dbo.entidad_pagadora e (nolock) where e.epa_rut = ep.epa_rut)
+							where tdc.DEC_DEUDA > 0	--reforzar
 
                             -- Nuevo Validar que se hayan insertado filas
                             IF @@ROWCOUNT = 0
@@ -1574,7 +1643,7 @@ END
   
  END
  
- --Borrar registros antiguos de GCO_ENVMSG_DEUDA_CUPONES
+ --Borrar registros antiguos de GCO_ENVMSG_DEUDA_CUPONES y GCO_ENVMSG_DEUDA_CUPONES_DEUFIN
  IF @generar_cupones = 'S'
 	BEGIN
 
