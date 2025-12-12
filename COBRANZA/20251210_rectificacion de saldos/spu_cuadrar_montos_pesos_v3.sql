@@ -1,4 +1,4 @@
---EXECUTE spu_cuadrar_montos_pesos '     15105'
+﻿--EXECUTE spu_cuadrar_montos_pesos '     15105'
 
 ---Restaurar valores iniciales
 --update DEVOLUCION_TFU_CUOTA set DTC_MONTO_PESOS_RESP = DTC_MONTO_PESOS
@@ -30,14 +30,31 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @RegistrosActualizados INT;
-    SET @RegistrosActualizados = 0;
+        --------------------------------------------------------------------
+        -- 0. Variables
+        --------------------------------------------------------------------
+        DECLARE 
+              @AFI_RUT            CHAR(10)
+            , @CTA_FECHA_APERTURA DATETIME
+            , @MCT_CORRELATIVO    INT
+            , @CUOTAS             INT
+            , @MCT_MONTO          NUMERIC(18,6)
+            , @SUMA_DTC_MONTO_PESOS NUMERIC(15,0)
+            , @DIF                NUMERIC(18,6)     --diferencia entre @MCT_MONTO - @SUMA_DTC_MONTO_PESOS
+            , @SALDO              INT;              --saldo en pesos a repartir entre las cuotas
+
+        DECLARE 
+              @DTC_ID    INT
+            , @MONTO_ACT NUMERIC(18,2);
+
+        DECLARE @RegistrosActualizados INT;
+        SET @RegistrosActualizados = 0;     --inicialización
 
     BEGIN TRY
         BEGIN TRAN;
 
         --------------------------------------------------------------------
-        -- 1. Casos descuadrados iniciales (contra RESP)
+        -- 1. Casos descuadrados iniciales 
         --------------------------------------------------------------------
         IF OBJECT_ID('tempdb..#Descuadres') IS NOT NULL DROP TABLE #Descuadres;
 
@@ -47,7 +64,7 @@ BEGIN
             , D.MCT_CORRELATIVO
             , COUNT(*)                    AS CUOTAS
             , MAX(M.MCT_MONTO)            AS MCT_MONTO
-            , SUM(D.DTC_MONTO_PESOS_RESP) AS SUMA_CUOTAS
+            , SUM(D.DTC_MONTO_PESOS_RESP) AS SUMA_DTC_MONTO_PESOS
 			--, MAX(M.MCT_MONTO)-SUM(DTC_MONTO_PESOS) AS DIFERENCIA
         INTO #Descuadres
         FROM DEVOLUCION_TFU_CUOTA D
@@ -69,33 +86,17 @@ BEGIN
 		--	RETURN;  
 		--END
 
-        --------------------------------------------------------------------
-        -- 2. Variables
-        --------------------------------------------------------------------
-        DECLARE 
-              @AFI_RUT            CHAR(12)
-            , @CTA_FECHA_APERTURA DATETIME
-            , @MCT_CORRELATIVO    INT
-            , @CUOTAS             INT
-            , @MCT_MONTO          NUMERIC(18,2)
-            , @SUMA_CUOTAS        NUMERIC(18,2)
-            , @DIF                NUMERIC(18,2)
-            , @SALDO              INT;
-
-        DECLARE 
-              @DTC_ID    INT
-            , @MONTO_ACT NUMERIC(18,2);
 
         --------------------------------------------------------------------
-        -- 3. Cursor de casos descuadrados: ajustar RESP
+        -- 3. Cursor de casos descuadrados: 
         --------------------------------------------------------------------
-        DECLARE curDescuadres CURSOR LOCAL FAST_FORWARD FOR
+        DECLARE curDescuadres CURSOR LOCAL FAST_FORWARD FOR         --Bloquea mínimamente → Otros usuarios TRABAJAN en paralelo sobre la tabla, Menos memoria + menos CPU + locks(bloqieos) mínimos = RÁPIDO
             SELECT AFI_RUT,
                    CTA_FECHA_APERTURA,
                    MCT_CORRELATIVO,
                    CUOTAS,
                    MCT_MONTO,
-                   SUMA_CUOTAS
+                   SUMA_DTC_MONTO_PESOS
             FROM #Descuadres;
 
         OPEN curDescuadres;
@@ -106,7 +107,7 @@ BEGIN
               @MCT_CORRELATIVO,
               @CUOTAS,
               @MCT_MONTO,
-              @SUMA_CUOTAS;
+              @SUMA_DTC_MONTO_PESOS;
 
         WHILE @@FETCH_STATUS = 0
         BEGIN
@@ -114,56 +115,57 @@ BEGIN
 			SET @DIF   = 0;
 			SET @SALDO = 0;
 
-            SET @DIF   = @MCT_MONTO - @SUMA_CUOTAS;
-            SET @SALDO = CAST(@DIF AS INT);   -- unidad = 1 peso (ajusta si usas decimales)
+            SET @DIF   = @MCT_MONTO - @SUMA_DTC_MONTO_PESOS;
+            SET @SALDO = CAST(@DIF AS INT);   -- unidad = 1 peso (ajusta si usa decimales)
 
-            --IF @SALDO <> 0 --AND @CUOTAS > 0
-            --BEGIN
-                WHILE @SALDO <> 0
+            --si existe saldo negativo ó positivo
+            --Si se terminan las cuotas y aún queda saldo, el código vuelve a empezar desde la primera cuota y sigue dando vueltas hasta consumir todo el saldo
+            WHILE @SALDO <> 0
+            BEGIN
+                
+                DECLARE curCuotas CURSOR LOCAL FAST_FORWARD FOR
+
+					--listados de cuotas para un rut, fecha_apertura y correlativo ordenados por dtc_periodo
+                    SELECT DTC_ID,
+                            DTC_MONTO_PESOS_RESP
+                    FROM DEVOLUCION_TFU_CUOTA WITH (NOLOCK)
+                    WHERE AFI_RUT            = @AFI_RUT
+                        AND CTA_FECHA_APERTURA = @CTA_FECHA_APERTURA
+                        AND MCT_CORRELATIVO    = @MCT_CORRELATIVO
+                    ORDER BY DTC_PERIODO ASC, DTC_ID ASC;
+
+                OPEN curCuotas;
+
+                FETCH NEXT FROM curCuotas INTO @DTC_ID, @MONTO_ACT;
+
+                WHILE @@FETCH_STATUS = 0 AND @SALDO <> 0
                 BEGIN
-                    DECLARE curCuotas CURSOR LOCAL FAST_FORWARD FOR
-
-						--listados de cuotas para un rut, fecha_apertura y correlativo
-                        SELECT DTC_ID,
-                               DTC_MONTO_PESOS_RESP
-                        FROM DEVOLUCION_TFU_CUOTA
-                        WHERE AFI_RUT            = @AFI_RUT
-                          AND CTA_FECHA_APERTURA = @CTA_FECHA_APERTURA
-                          AND MCT_CORRELATIVO    = @MCT_CORRELATIVO
-                        ORDER BY DTC_PERIODO ASC, DTC_ID ASC;
-
-                    OPEN curCuotas;
-
-                    FETCH NEXT FROM curCuotas INTO @DTC_ID, @MONTO_ACT;
-
-                    WHILE @@FETCH_STATUS = 0 AND @SALDO <> 0
+                    IF @SALDO > 0		--para saldos positivos, sumar
                     BEGIN
-                        IF @SALDO > 0		--para saldos positivos, sumar
-                        BEGIN
-                            UPDATE DEVOLUCION_TFU_CUOTA
-                               SET DTC_MONTO_PESOS_RESP = DTC_MONTO_PESOS_RESP + 1
-                            WHERE DTC_ID = @DTC_ID;
+                        UPDATE DEVOLUCION_TFU_CUOTA
+                            SET DTC_MONTO_PESOS_RESP = DTC_MONTO_PESOS_RESP + 1
+                        WHERE DTC_ID = @DTC_ID;
 
-                            SET @SALDO = @SALDO - 1;
-                            SET @RegistrosActualizados = @RegistrosActualizados + 1;
-                        END
-                        ELSE IF @SALDO < 0	--para saldos negativos, restar
-                        BEGIN
-                            UPDATE DEVOLUCION_TFU_CUOTA
-                               SET DTC_MONTO_PESOS_RESP = DTC_MONTO_PESOS_RESP - 1
-                            WHERE DTC_ID = @DTC_ID;
+                        SET @SALDO = @SALDO - 1;
+                        SET @RegistrosActualizados = @RegistrosActualizados + 1;
+                    END
+                    ELSE IF @SALDO < 0	--para saldos negativos, restar
+                    BEGIN
+                        UPDATE DEVOLUCION_TFU_CUOTA
+                            SET DTC_MONTO_PESOS_RESP = DTC_MONTO_PESOS_RESP - 1
+                        WHERE DTC_ID = @DTC_ID;
 
-                            SET @SALDO = @SALDO + 1;
-                            SET @RegistrosActualizados = @RegistrosActualizados + 1;
-                        END
-
-                        FETCH NEXT FROM curCuotas INTO @DTC_ID, @MONTO_ACT;
+                        SET @SALDO = @SALDO + 1;
+                        SET @RegistrosActualizados = @RegistrosActualizados + 1;
                     END
 
-                    CLOSE curCuotas;
-                    DEALLOCATE curCuotas;
+                    FETCH NEXT FROM curCuotas INTO @DTC_ID, @MONTO_ACT;
                 END
-            --END
+
+                CLOSE curCuotas;
+                DEALLOCATE curCuotas;
+            END
+
 
             FETCH NEXT FROM curDescuadres INTO 
                   @AFI_RUT,
@@ -171,17 +173,16 @@ BEGIN
                   @MCT_CORRELATIVO,
                   @CUOTAS,
                   @MCT_MONTO,
-                  @SUMA_CUOTAS;
+                  @SUMA_DTC_MONTO_PESOS;
         END
 
         CLOSE curDescuadres;
         DEALLOCATE curDescuadres;
 
         --------------------------------------------------------------------
-        -- 4. Revisi�n final de descuadres
+        -- 4. Revisión final de descuadres: reviso si la iteracion dejo algun descuadre (esto no seria correcto) pero si lo hay se hace rollback y se guarda en una tabla temporal para analizar
         --------------------------------------------------------------------
-        IF OBJECT_ID('tempdb..#DescuadresFinal') IS NOT NULL
-            DROP TABLE #DescuadresFinal;
+        IF OBJECT_ID('tempdb..#DescuadresFinal') IS NOT NULL  DROP TABLE #DescuadresFinal;
 
         SELECT  
               D.AFI_RUT
@@ -189,7 +190,7 @@ BEGIN
             , D.MCT_CORRELATIVO
             , COUNT(*)                    AS CUOTAS
             , MAX(M.MCT_MONTO)            AS MCT_MONTO
-            , SUM(D.DTC_MONTO_PESOS_RESP) AS SUMA_CUOTAS
+            , SUM(D.DTC_MONTO_PESOS_RESP) AS SUMA_DTC_MONTO_PESOS
             , MAX(M.MCT_MONTO) - SUM(D.DTC_MONTO_PESOS_RESP) AS DIFERENCIA
         INTO #DescuadresFinal
         FROM DEVOLUCION_TFU_CUOTA D
@@ -212,7 +213,7 @@ BEGIN
 
             ROLLBACK TRAN;
 
-            RAISERROR('Persisten casos descuadrados despu�s del ajuste. Revisar #DescuadresFinal.', 16, 1);
+            RAISERROR('Persisten casos descuadrados después del ajuste. Revisar #DescuadresFinal.', 16, 1);
             RETURN;
         END
 
