@@ -1,0 +1,26 @@
+USE ISAPRE
+GO
+
+SELECT DDR_RUT
+      ,DDR_NOMBRE
+      ,DDR_DIRECCION
+      ,DDR_DIRECCION2
+      ,CIU_CODIGO
+      ,CMN_CODIGO
+      ,DDR_TELEFONO
+      ,DDR_EMAIL
+      ,DDR_INF_CONTACTO
+      ,DDR_CELULAR
+      ,DDR_GIRO
+      ,DDR_RUT_REPR
+      ,DDR_NOM_REPR
+      ,DDR_TIPO_REPR
+      ,RAC_CODIGO
+      ,TDE_CODIGO
+      ,DDR_QUIEBRA
+      ,DDR_MEDIATICA
+  FROM dbo.DEUDOR
+
+GO
+
+
