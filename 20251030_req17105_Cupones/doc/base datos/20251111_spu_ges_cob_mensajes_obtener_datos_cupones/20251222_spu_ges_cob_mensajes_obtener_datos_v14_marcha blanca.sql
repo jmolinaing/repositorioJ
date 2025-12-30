@@ -90,10 +90,14 @@ REVISION EJ2: select * from GCO_ENVMSG_MENSAJE where eme_fechareg = '2025-12-05 
   
 --EJ3: Plantilla:30, Filtros: , SOLO GENERACION DE CUPONES  
 execute spu_ges_cob_mensajes_obtener_datos 30, 'N', NULL, NULL, 'S'  --945 REG, 19SEG con su url_link y cup_correl OK  
-  
+
+
+
+
+execute spu_ges_cob_mensajes_obtener_datos 1, 'N', NULL, NULL, 'S'  
 */    
     
-CREATE procedure [dbo].[spu_ges_cob_mensajes_obtener_datos]     
+ALTER procedure [dbo].[spu_ges_cob_mensajes_obtener_datos]     
 @epl_codigo varchar(50) = null    
 , @enviar char(1) = 'N'    
 , @epr_codigo numeric(10) = null    
@@ -945,8 +949,7 @@ END
     
  --tabla de equipos de cobradores     
  select distinct deuda_cob.cob_codigo cob_codigo    
- , COALESCE(( case when coalesce(deuda_cob.cob_judicial,'N') = 'S' then 'JUDICIAL' else NULL end ), (case when coalesce(cob_dep.cob_codigo,0) = 9000 then 'STOCK' else NULL end), (case when coalesce(cob_dep.cob_codigo,0) = 9002 then 'INTERNO' else NULL en
-d  
+ , COALESCE(( case when coalesce(deuda_cob.cob_judicial,'N') = 'S' then 'JUDICIAL' else NULL end ), (case when coalesce(cob_dep.cob_codigo,0) = 9000 then 'STOCK' else NULL end), (case when coalesce(cob_dep.cob_codigo,0) = 9002 then 'INTERNO' else NULL end  
 ), (case when ( (coalesce(cob_dep.cob_codigo,0) = 9002) or (coalesce(cob_dep.cob_codigo,0) = 9000) or (coalesce(deuda_cob.cob_judicial,'N') = 'S' ) ) then NULL else 'OTROS' end)    )  as equipo_cobrador    
  into #equipo_cobrador    
  from cobrador deuda_cob with (nolock)     
@@ -1219,7 +1222,7 @@ declare @sqlfiltrado nvarchar(4000)
 ---------------------------------------------------------------------------------------------------------------  
 ----GENERAR CUPONES  
   
-set @generar_cupones = 'N'  --Marcha Blanca  
+--set @generar_cupones = 'N'  --Marcha Blanca  
   
 IF @generar_cupones = 'S'  
   
@@ -1342,7 +1345,10 @@ BEGIN
              -- Actualizar tabla filtrada con monto y URL del cupón  
              UPDATE tf  
              SET cup_correl = tc.cup_correl  
-             , url_link = tc.link  
+             --, url_link = tc.link  
+               , url_link   = SUBSTRING(tc.link, 1, 40)
+               , url_link1  = SUBSTRING(tc.link, 41, 40)
+               , url_link2  = SUBSTRING(tc.link, 81, 40)
              from #tabla_final_filtrada tf  
              join #tabla_cupones tc  
               on tf.rut_deudor = tc.rut_deudor  
@@ -1464,7 +1470,10 @@ BEGIN
              -- Actualizar tabla filtrada con monto y URL del cupón  
              UPDATE tf  
              SET cup_correl = tc.cup_correl  
-             , url_link = tc.link  
+             --, url_link = tc.link 
+               , url_link   = SUBSTRING(tc.link, 1, 40)
+               , url_link1  = SUBSTRING(tc.link, 41, 40)
+               , url_link2  = SUBSTRING(tc.link, 81, 40)
              from #tabla_final_filtrada tf  
              join #tabla_cupones tc  
               on tf.rut_deudor = tc.rut_deudor  
