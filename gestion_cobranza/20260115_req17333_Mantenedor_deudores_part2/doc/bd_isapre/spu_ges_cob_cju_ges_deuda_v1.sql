@@ -42,8 +42,8 @@ select mcob.cob_codigo
         from resolucion_judicial rjud WITH (NOLOCK)  
        where rjud.ddr_rut = mdeu.ddr_rut  
      ) as cob_rju_vig
-	, mdeu.ddr_quiebra ddr_quiebra
 	, mdeu.ddr_mediatica ddr_mediatica
+	, mdeu.ddr_quiebra ddr_quiebra
 	, (select max(ppc_fecha_pago) from dbo.planilla pp with (nolock) where pp.epa_rut = mdeu.ddr_rut  ) as ult_fecha_pago
   into #deuda  
   from cobrador as mcob WITH (NOLOCK)  
@@ -63,7 +63,7 @@ select mcob.cob_codigo
   
   select   
   cob_codigo, pcheck, deudor_rut, deudor_nombre, DEC_PERIODO, 'NP' as tipo_deuda, (deuda - dnp) as deuda , deu_correl, cob_nom, cob_rju_vig  
-  , ddr_quiebra, ddr_mediatica, ult_fecha_pago
+ , ddr_mediatica, ddr_quiebra, ult_fecha_pago
   into #respuesta  
   from #deuda where deuda > dnp  
   
@@ -71,7 +71,7 @@ select mcob.cob_codigo
   
   select   
   cob_codigo, pcheck, deudor_rut, deudor_nombre, DEC_PERIODO, 'DNP' as tipo_deuda, dnp as deuda , deu_correl, cob_nom, cob_rju_vig 
-   , ddr_quiebra, ddr_mediatica , ult_fecha_pago
+   , ddr_mediatica, ddr_quiebra , ult_fecha_pago
   from #deuda where dnp > 0  
   
   
@@ -87,8 +87,8 @@ select mcob.cob_codigo
    deu_correl,   
    cob_nom,   
    cob_rju_vig  
-  , case when ddr_quiebra = 'S' then 'Si' else 'No' end as ddr_quiebra
   , case when ddr_mediatica = 'S' then 'Si' else 'No' end as ddr_mediatica
+  , case when ddr_quiebra = 'S' then 'Si' else 'No' end as ddr_quiebra
   , ult_fecha_pago
   from #respuesta  
   group by cob_codigo,pcheck, deudor_rut, deudor_nombre, deu_correl , cob_nom, cob_rju_vig  
