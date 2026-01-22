@@ -1,19 +1,28 @@
   
-  
-  
-/* =======================================================================================*/  
-/*  Tipo de Objeto     : Procedimiento Almacenado            */  
-/*  Nombre Objeto      : spu_ges_cob_cju_ges_deuda            */  
-/*  Parmetros          : @p_cod_cob : codigo de cobrador judicial, ->0 para anular filtro */  
-/*        : @p_ind_rjud: indicador de exclusión de deudores sin resolución   */  
-/*           judicial, ->S Excluye ->N no excluye      */  
-/*  Sistema            : PB10 Gestion Cobranza             */  
-/*  Destino            : BD ISAPRE                */  
-/*  Creado por         : Proveedor Externo Aligare - Pablo Melo         */  
-/*  Fecha Creacin      : 12-04-2022                */  
-/*  Descripcion        : Obtiene deudores en cobranza judicial a quienes se puede    */  
-/*       generar resoluciones nuevas o complementarias.       */  
-/* =======================================================================================*/  
+/* =======================================================================================
+    Tipo de Objeto  : Procedimiento Almacenado             
+    Nombre Objeto   : spu_ges_cob_cju_ges_deuda             
+    Parmetros       : @p_cod_cob : codigo de cobrador judicial, ->0 para anular filtro 
+                    : @p_ind_rjud: indicador de exclusión de deudores sin resolución     
+                       judicial, ->S Excluye ->N no excluye        
+    Sistema         : PB10 Gestion Cobranza             
+    Destino         : BD ISAPRE                  
+    Creado por      : Proveedor Externo Aligare - Pablo Melo         
+    Fecha Creacin   : 12-04-2022                
+    Descripcion     : Obtiene deudores en cobranza judicial a quienes se puede     
+                      generar resoluciones nuevas o complementarias.     
+                        
+    Modificado      : Jorge Molina <jorge.molina@nuevamasvida.cl>
+    fecha           : 24-01-2026
+    Descripción     : Se agrega 3 parámetros @excluir_mediatica, @excluir_quiebra, @excluir_venta
+                      Se agrega 5 columnas en la salida:
+                      	1.- Empresa Mediatica (X)
+	                    2.- Empresa En Quiebra (X)
+	                    3.- Ventas Cuestionadas (X)	
+	                    4.- Fecha último pago (La mayor fecha entre COTIZACION_PAGADA y PLANILLA, buscando por EPA_RUT)
+	                    5.- Deuda ultimos 5 años (excluir deuda con RJ y ventas cuentionadas. Además considerar sólo 60 meses desde el ultimo contable cerrado)
+
+ =======================================================================================*/  
   
 -- spu_ges_cob_cju_ges_deuda 27,S  
 -- spu_ges_cob_cju_ges_deuda 27,N  
@@ -29,7 +38,7 @@ BEGIN
 
  declare @ult_periodo_cc datetime 
 
-    --Contable cerrado
+    --Periodo Contable cerrado
 	select @ult_periodo_cc = par_finvig from parametros where par_codigo='ucc'
 
      if (@ult_periodo_cc is null)
@@ -40,11 +49,37 @@ BEGIN
 
      set @ult_periodo_cc = dateadd(m, -60,  @ult_periodo_cc)  
 
-     --Deuda Total
-	SELECT DEC_RUT, DEC_PERIODO, COT_RUT, DEC_PACTADO - DEC_PAGADO AS DEUDA 
+    IF OBJECT_ID('tempdb..#afiliado_vta_cuestionada') IS NOT NULL DROP TABLE #afiliado_vta_cuestionada;
+    IF OBJECT_ID('tempdb..#deuda5_total') IS NOT NULL DROP TABLE #deuda5_total;
+    IF OBJECT_ID('tempdb..#deuda_rj') IS NOT NULL DROP TABLE #deuda_rj;
+    IF OBJECT_ID('tempdb..#deuda5_sin_rj') IS NOT NULL DROP TABLE #deuda5_sin_rj;
+    IF OBJECT_ID('tempdb..#deuda5_filtrada') IS NOT NULL DROP TABLE #deuda5_filtrada;
+    
+    --Listado afiliados con ventas cuestionadas
+    SELECT distinct c.cot_rut
+    into #afiliado_vta_cuestionada
+    FROM dbo.contrato c WITH (NOLOCK)   
+    JOIN dbo.fun f WITH (NOLOCK) 
+        ON f.con_folio = c.con_folio    
+    JOIN dbo.Gescob_ejecutivo_cuestionado g WITH (NOLOCK)
+        ON g.eje_rut = f.eje_rut
+    WHERE f.fun_tipo LIKE '%1%'
+        AND c.con_ultimo = 'S'
+
+    --Deuda Total 5 años, Solo RUT SIN ventas cuestionadas
+	SELECT DEC_RUT, DEC_PERIODO, dc.COT_RUT, DEC_PACTADO - DEC_PAGADO AS DEUDA 
     into #deuda5_total
-    FROM DEUDA_COTIZANTE with (nolock)
+    FROM DEUDA_COTIZANTE dc with (nolock)
+    left join #afiliado_vta_cuestionada avc
+        on dc.COT_RUT = avc.COT_RUT
     where DEC_PERIODO >= @ult_periodo_cc
+    and avc.cot_rut is null  
+
+    --1.085.136
+    --1.084.411
+   -- select * from #deuda5_total
+    --where dec_rut = cot_rut
+
 
     --Deuda con RJ
 	SELECT DDR_RUT, RJD_PERIODO, COT_RUT 
@@ -54,9 +89,9 @@ BEGIN
         ON R.REJ_FOLIO=RD.REJ_FOLIO
     where RJD_PERIODO >= @ult_periodo_cc
 
-
+    --Deuda Total 5 años, sin RJ
     SELECT d.DEC_RUT, d.DEC_PERIODO, d.COT_RUT, d.DEUDA
-    INTO #deuda_sin_rj
+    INTO #deuda5_sin_rj
     FROM #deuda5_total d WITH (NOLOCK)
     LEFT JOIN #deuda_rj r WITH (NOLOCK)
         ON d.DEC_RUT = r.DDR_RUT 
@@ -64,14 +99,12 @@ BEGIN
         AND d.COT_RUT = r.COT_RUT
     WHERE r.DDR_RUT IS NULL  -- Excluye coincidencias
 
-
+    --Suma deuda , con su dec_rut
     select dec_rut, sum(isnull(deuda, 0)) as deuda_sum 
     into #deuda5_filtrada
-    from #deuda_sin_rj 
+    from #deuda5_sin_rj 
     group by dec_rut
     --order by DEC_RUT, DEC_PERIODO
-
-
 
 
 
@@ -107,27 +140,16 @@ select mcob.cob_codigo
     ) THEN 'X' 
     ELSE '' 
 END AS venta_cuestionada
-  --	, (select max(ppc_fecha_pago) from dbo.planilla pp with (nolock) where pp.epa_rut = mdeu.ddr_rut  ) as ult_fecha_pago
---  , (SELECT MAX(fecha_pago) AS max_fecha_pago
---FROM (
---    SELECT cp.ppc_fecha_pago AS fecha_pago
---    FROM dbo.COTIZACION_PAGADA cp WITH (NOLOCK) 
---    WHERE cp.epa_rut = mdeu.ddr_rut
-    
---    UNION ALL
-    
---    SELECT pp.ppc_fecha_pago
---    FROM dbo.planilla pp WITH (NOLOCK) 
---    WHERE pp.epa_rut = mdeu.ddr_rut
---) t
---) as ult_fecha_pago
 , ufp.ppc_fecha_pago as ult_fecha_pago
 , isnull(deuda_sum, 0) as deuda5anos
   into #deuda_pre  
   from cobrador as mcob WITH (NOLOCK)  
-   join deudor_asignado as odasg WITH (NOLOCK) on odasg.cob_codigo = mcob.cob_codigo and odasg.deu_asig_desde < getdate() and ( odasg.deu_asig_hasta >= getdate() or odasg.deu_asig_hasta is null)  
-   join deuasig_periodo as odasgper WITH (NOLOCK) on odasgper.deu_correl = odasg.deu_correl  
-   join deudor as mdeu WITH (NOLOCK) on mdeu.ddr_rut = odasg.ddr_rut  
+   join deudor_asignado as odasg WITH (NOLOCK) 
+        on odasg.cob_codigo = mcob.cob_codigo and odasg.deu_asig_desde < getdate() and ( odasg.deu_asig_hasta >= getdate() or odasg.deu_asig_hasta is null)  
+   join deuasig_periodo as odasgper WITH (NOLOCK) 
+        on odasgper.deu_correl = odasg.deu_correl  
+   join deudor as mdeu WITH (NOLOCK) 
+        on mdeu.ddr_rut = odasg.ddr_rut  
 
    left join 
    (
@@ -145,10 +167,10 @@ END AS venta_cuestionada
     ) ufp
     on ufp.epa_rut = mdeu.ddr_rut
  left join #deuda5_filtrada
-    on dec_rut = mdeu.ddr_rut
+        on dec_rut = mdeu.ddr_rut
   where mcob.cob_judicial ='S'  
-   and (mcob.cob_codigo=@p_cod_cob or  @p_cod_cob is null)  
-   and (@p_ind_rjud ='N' or not exists (  
+    and (mcob.cob_codigo=@p_cod_cob or  @p_cod_cob is null)  
+    and (@p_ind_rjud ='N' or not exists (  
       select 1  
      from DEUDA_COTIZANTE dc WITH (NOLOCK) where dc.DEC_RUT=odasg.DDR_RUT and dc.COT_RUT=odasgper.COT_RUT and dc.DEC_PERIODO= odasgper.DEC_PERIODO and DEC_NRORESOL > 0  
       ))  
@@ -161,7 +183,7 @@ END AS venta_cuestionada
 
 
 
-	select *
+    select *
 	into #deuda
 	from #deuda_pre 
 	where ( (@excluir_venta = 'S' and (venta_cuestionada = '' or venta_cuestionada is null )   )
@@ -199,33 +221,7 @@ END AS venta_cuestionada
    cob_rju_vig  
   , case when ddr_mediatica = 'S' then 'X' else '' end as ddr_mediatica
   , case when ddr_quiebra = 'S' then 'X' else '' end as ddr_quiebra
-  --, (select case when count(*) > 0 then 'X' else '' end
-  --      from dbo.contrato c with (nolock)   
-  --      join dbo.fun f with (nolock) 
-  --          on f.con_folio= c.con_folio    
-  --               --left join cotizante  (nolock) on cotizante.cot_rut=c.cot_rut  
-  --               --left join ejecutivo e (nolock) on e.eje_rut=f2.eje_rut  
-  --      join dbo.Gescob_ejecutivo_cuestionado g with (nolock)
-  --             on g.eje_rut = f.eje_rut
-  --      where f.fun_tipo like ( '%1%')
-  --      and c.con_ultimo = 'S'
-  --      and c.cot_rut = deudor_rut
-  --      ) as venta_cuestionada
---  , CASE 
---    WHEN EXISTS (
---        SELECT 1
---        FROM dbo.contrato c WITH (NOLOCK)   
---        JOIN dbo.fun f WITH (NOLOCK) 
---            ON f.con_folio = c.con_folio    
---        JOIN dbo.Gescob_ejecutivo_cuestionado g WITH (NOLOCK)
---            ON g.eje_rut = f.eje_rut
---        WHERE f.fun_tipo LIKE '%1%'
---            AND c.con_ultimo = 'S'
---            AND c.cot_rut = deudor_rut
---    ) THEN 'X' 
---    ELSE '' 
---END AS venta_cuestionada
-, venta_cuestionada
+  , venta_cuestionada
   , ult_fecha_pago
   , isnull(deuda5anos, 0) as deuda5anos
   from #respuesta  
