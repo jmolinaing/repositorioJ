@@ -1,0 +1,28 @@
+En el cálculo la deuda 5 años para la deuda judicial en el "spu_ges_cob_cju_ges_deuda" se debe considerar deuda desde el último periodo "vencido" hacia atrás:
+
+Con esta consulta se obtiene el vencimiento actual:
+SELECT * FROM VENCIM_PAGO_COTIZACION WHERE CONVERT(CHAR(6),VPC_VENCIMIENTO ,112) = CONVERT(CHAR(6),GETDATE() ,112)
+
+-----------
+
+Lo mismo se debe corregir en el SP "spu_ges_cob_mensajes_obtener_datos" para la variable @primerdiadelmes, ya que debe considerar desde el mes "vencido" hacia atrás
+
+
+--------
+
+En la ventana de filtros de los mensajes Bulk, debe quedar excluyente el "Tipo y Vigencia deudor", debiendo siempre seleccionar al menos uno de ellos.
+
+-----------
+
+En el cálculo de la deuda para generar los cupones de pago, debe considerar los descuentos a los RIR en base al tipo de deudor (Vigente, No vigente o Empresa)
+
+Para obtener los descuentos de n periodo, utilizar esta consulta:
+
+	select top 1 '20250201' AS PERIODO, descto_cotiz= coalesce(GCD_PORC_DEUDA, 0), descto_rea=coalesce(GCD_PORC_REAJ, 0), descto_int=coalesce(GCD_PORC_INT, 0), descto_rec=coalesce(GCD_PORC_REC,0)
+	from GCO_DCTO_DEUDATOT
+	where GCD_TIPODEUDOR = 'E'
+		AND GCD_MESES_DESDE <= dbo.f_cob_antiguedad_deuda ('20250201', getdate())
+		AND ( GCD_MESES_HASTA >= dbo.f_cob_antiguedad_deuda ('20250201', getdate())	OR GCD_MESES_HASTA IS NULL)
+	order by GCD_MESES_DESDE DESC;
+
+----------------
