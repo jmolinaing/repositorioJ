@@ -46,11 +46,10 @@ BEGIN
 
     --Periodo Contable cerrado v2
     --Con esta consulta se obtiene el vencimiento actual:
-
     select top 1 @ult_periodo_cc =
         case 
             when getdate() < vpc_vencimiento then 
-                dateadd(month, -1, vpc_periodo)  -- antes del vencimiento: período anterior
+                dateadd(month, -1, vpc_periodo)   -- antes del vencimiento: período anterior
             else 
                 vpc_periodo                       -- después del vencimiento: período original
         end 
@@ -92,9 +91,6 @@ BEGIN
     where DEC_PERIODO >= @ult_periodo_cc
     and avc.cot_rut is null  
 
-    --1.085.136
-    --1.084.411
-   -- select * from #deuda5_total
 
     --Deuda con RJ
 	SELECT DDR_RUT, RJD_PERIODO, COT_RUT 
