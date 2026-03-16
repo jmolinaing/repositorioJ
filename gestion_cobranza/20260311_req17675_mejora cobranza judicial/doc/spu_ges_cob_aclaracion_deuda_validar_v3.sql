@@ -22,12 +22,12 @@
 
 
 /* EJEMPLOS:
- EXECUTE spu_ges_cob_aclaracion_deuda_validar ' 769633391', ' 154972323' , '20260101', null, 'MASANHUEZ'		-- REJ_FOLIO: 10 NO ESTA INGRESADO EN TRIBUNALES 10%
- EXECUTE spu_ges_cob_aclaracion_deuda_validar 100, 5556   -- REJ_FOLIO: 5556 INGRESADA A TRIBUNALES 15%
+ EXECUTE spu_ges_cob_aclaracion_deuda_validar ' 769633391', ' 154972323' , '20260101', null, 'MSANHUEZ'		-- REJ_FOLIO: 10 NO ESTA INGRESADO EN TRIBUNALES 10%
+ EXECUTE spu_ges_cob_aclaracion_deuda_validar ' 768410801', ' 172046495' , '20161201', '19000101', 'MSANHUEZ'   -- REJ_FOLIO: 5556 INGRESADA A TRIBUNALES 15%
 */
 
 
-CREATE PROCEDURE spu_ges_cob_aclaracion_deuda_validar
+alter PROCEDURE spu_ges_cob_aclaracion_deuda_validar
     @epa_rut CHAR(10),
     @cot_rut CHAR(10),
     @perdesde DATETIME = NULL,
@@ -56,13 +56,17 @@ BEGIN
         )
         BEGIN
             DECLARE @nombre_cobrador VARCHAR(100) = ISNULL((
-                SELECT TOP 1 usu_nombre FROM usuarios 
-                WHERE root IN (SELECT root_supervisor FROM asignaciones_judicial WHERE epa_rut = @epa_rut)
-            ), 'a cargo');
+                SELECT TOP 1 cob_nombre FROM cobrador c with (nolock) 
+                WHERE cob_codigo IN (select cob_codigo 
+                                    from deudor_asignado_superv_cjud a with (nolock)
+                                    where daj_asig_desde <= getdate()
+                                    and ( daj_asig_hasta >= getdate() or daj_asig_hasta is null)
+                                    and ddr_rut = @epa_rut)
+            ), ' ');
 
             SET @error = -1;
             SET @texto_error = 'No es posible registrar la solicitud ya que la empresa se encuentra en cobranza judicial, ' +
-                               'por lo que debe comunicarse con la ejecutiva(o) a cargo [' + @nombre_cobrador + '].';
+                               'por lo que debe comunicarse con la ejecutiva(o) a cargo: [' + @nombre_cobrador + '].';
         END
     END
 
