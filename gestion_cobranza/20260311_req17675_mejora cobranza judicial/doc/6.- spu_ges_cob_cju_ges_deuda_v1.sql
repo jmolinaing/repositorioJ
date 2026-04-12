@@ -31,7 +31,9 @@
     Modificado      : Jorge Molina <jorge.molina@nuevamasvida.cl>  
     fecha           : 27-03-2026  
     Descripción     : Req#17675  
-                      Se agrega parámetro @excluir_afiliados char(1) = null 
+                      1.- Se agrega parámetro @excluir_afiliados char(1) = null 
+                      2.- de DEUDA_COTIZANTE, DEC_RUT <> dc.COT_RUT, el rut del deudor debe ser siempre distinto al rut del afiliado
+                            , por que eso nunca debemos considerar.
  =======================================================================================*/    
     
 -- spu_ges_cob_cju_ges_deuda 27,S    
@@ -98,6 +100,7 @@ BEGIN
     left join #afiliado_vta_cuestionada avc  
         on dc.COT_RUT = avc.COT_RUT  
     where DEC_PERIODO >= @ult_periodo_cc  
+    and DEC_RUT <> dc.COT_RUT   --Req#17675
     and avc.cot_rut is null    
   
   
@@ -373,7 +376,13 @@ WHERE mcob.COB_JUDICIAL = 'S'
   , ult_fecha_pago  
   , isnull(deuda5anos, 0) as deuda5anos
   , cast(null as varchar(2)) as afiliado
-  from #respuesta    
+  from #respuesta
+  left join dbo.contrato c WITH (NOLOCK)                    --Req#17675
+        ON c.COT_RUT = deudor_rut AND c.CON_ULTIMO = 'S'
+    where ( (@excluir_afiliados = 'S' and c.COT_RUT is null)  --Req#17675
+            or @excluir_afiliados = 'N' 
+            or @excluir_afiliados is null  
+            )
   group by cob_codigo,pcheck, deudor_rut, deudor_nombre, deu_correl , cob_nom, cob_rju_vig    
     , ddr_quiebra  
   , ddr_mediatica  
