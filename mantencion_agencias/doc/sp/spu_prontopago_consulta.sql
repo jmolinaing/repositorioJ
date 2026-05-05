@@ -17,9 +17,9 @@
 
  =======================================================================================*/  
   
---execute spu_ges_cob_cju_ges_deuda null, 'S', 's', 'N', 's'
+--execute spu_prontopago_consulta null, null, null
   
-CREATE PROCEDURE [dbo].[spu_pront_consulta] @rut chat(10), @fecdesde datetime = null, @fecdesde datetime = null
+ALTER PROCEDURE [dbo].[spu_prontopago_consulta] @rut char(10), @fecdesde datetime = null, @fechasta datetime = null
 AS  
 BEGIN   
  SET NOCOUNT ON;  
@@ -32,8 +32,8 @@ BEGIN
       --,SPP_DIRECCION      --no
       ,SPP_EMAIL
       ,SPP_USUARIO
-      ,SPP_TIPO
-      ,SPP_FORMA_PAGO
+      ,case SPP_TIPO when 'W' then 'Web' when 'M' then 'Manual' else '' end as SPP_TIPO
+      ,case SPP_FORMA_PAGO when 'T' then 'Transferencia' when 'V' then 'Vale Vista' else '' end as SPP_FORMA_PAGO
       ,spp.BCO_CODIGO AS BCO_CODIGO
       , b.BCO_NOMBRE AS BCO_NOMBRE
       ,TIPO_CTA
@@ -53,8 +53,9 @@ BEGIN
   FROM dbo.SOLIC_PRONTO_PAGO_TFU spp with (nolock)
   left join dbo.banco b  with (nolock)
     on.spp.bco_codigo = b.bco_codigo
-
-
+    WHERE ( SPP_RUT = @rut or @rut is null )
+    and ( SPP_FECHA >= @fecdesde or @fecdesde is null )
+    and ( SPP_FECHA <= @fechasta or @fechasta is null )
 
 
 END
