@@ -2,9 +2,9 @@
 /* =======================================================================================
     Tipo de Objeto  : Procedimiento Almacenado             
     Nombre Objeto   : spu_prontopago_consulta             
-    Parmetros       : @rut : 
-                    : @fecdesde:
-                    : @fechasta:   
+    Parmetros       : @rut : Rut del cotizante.
+                    : @fecdesde: fecha desde para consulta.
+                    : @fechasta: fecha hasta para consulta.  
     Sistema         : Mantención Agencias.            
     Destino         : BD ISAPRE                  
     Creado por      : Jorge Molina      
@@ -16,10 +16,11 @@
     Descripción     : 
 
  =======================================================================================*/  
-  
+ 
+-- GRANT EXECUTE ON [dbo].[spu_prontopago_consulta] TO public;
 --execute spu_prontopago_consulta null, null, null
   
-ALTER PROCEDURE [dbo].[spu_prontopago_consulta] @rut char(10), @fecdesde datetime = null, @fechasta datetime = null
+CREATE PROCEDURE [dbo].[spu_prontopago_consulta] @rut char(10), @fecdesde datetime = null, @fechasta datetime = null
 AS  
 BEGIN   
  SET NOCOUNT ON;  
@@ -29,15 +30,15 @@ BEGIN
       ,SPP_FECHA
       ,SPP_RUT
       ,SPP_NOMBRE
-      --,SPP_DIRECCION      --no
+      --,SPP_DIRECCION 
       ,SPP_EMAIL
       ,SPP_USUARIO
       ,case SPP_TIPO when 'W' then 'Web' when 'M' then 'Manual' else '' end as SPP_TIPO
       ,case SPP_FORMA_PAGO when 'T' then 'Transferencia' when 'V' then 'Vale Vista' else '' end as SPP_FORMA_PAGO
       ,spp.BCO_CODIGO AS BCO_CODIGO
       , b.BCO_NOMBRE AS BCO_NOMBRE
-      ,TIPO_CTA
-      ,SPP_NUMCTACTE
+      ,case SPP_FORMA_PAGO when 'T' then 'Transferencia' when 'V' then null else (case TIPO_CTA when 'C' then 'Corriente' when 'V' then 'Vista' else '' end) end as TIPO_CTA        --**
+      ,case SPP_FORMA_PAGO when 'T' then 'Transferencia' when 'V' then null else SPP_NUMCTACTE end as SPP_NUMCTACTE                    --**
       ,SPP_SALDO_RESTITUCION_UF
       ,SPP_SALDO_RESTITUCION_PESOS
       ,SPP_DEUDA_COTIZ
