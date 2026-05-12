@@ -1,0 +1,72 @@
+1.- migración OK 1 WARNING
+1.1 se busco w_precarga, y nada.
+2.- importar bco_objetos.pbl -> f_copiar_runtime, pero aca no tiene bco_objetos.pbl, se dejara en pro_objetos1.pbl OK
+2.- importar bco_objetos.pbl -> f_conexion_sec, en este caso se dejo en pro_objetos1.pbl OK
+
+2.2.- f_copiar_runtime() en open() -> mod_w_frame   OK
+2.3 .- copiar Sybase.PowerBuilder.DataWindow.Excel12.dll en la carpeta, OK
+
+Cambiar forma de conexión a la base de datos =======================
+BUSCAR: MSOLEDBSQL SQL Server
+
+ ---------- Search: Searching Target rrhh for 'MSOLEDBSQL SQL Server'    (19:49:12)
+ ---------- 10 Matches Found On "MSOLEDBSQL SQL Server":
+remuneraciones.pbl(w_pozo_referidos)open.0003:  itr_transac.DBMS = "MSOLEDBSQL SQL Server"
+bco_gen.pbl(bco_tr).of_lee_ini.0008:  this.DBMS       = "MSOLEDBSQL SQL Server"
+centralizacion.pbl(w_remu_centraliza_documentos)open.0014:   gtr_remu.DBMS            = "MSOLEDBSQL SQL Server"
+liquidacion.pbl(w_login_rem).cb_conectar.clicked.0047:   Sqlca.DBMS   = "MSOLEDBSQL SQL Server"
+liquidacion.pbl(w_login_rem_20260508_v0).cb_conectar.clicked.0047:   Sqlca.DBMS   = "MSOLEDBSQL SQL Server"
+pro_objetos1.pbl(f_conexion_sec)0101:  atr_transaccion.DBMS = "MSOLEDBSQL SQL Server"
+pro_objetos1.pbl(w_login).cb_conectar.clicked.0044:  sqlca.DBMS       = "MSOLEDBSQL SQL Server"
+pro_objetos_cont.pbl(w_login_cont).cb_conectar.clicked.0021:   sqlca.DBMS       = "MSOLEDBSQL SQL Server"
+req18275_pb2019.pbl(w_mej_mant_ejecutivo)oe_postopen.0007:  itr_transac.DBMS   = "MSOLEDBSQL SQL Server"
+req18275_pb2019.pbl(w_mej_mant_ejecutivo_20260508_v0)oe_postopen.0007:  itr_transac.DBMS   = "MSOLEDBSQL SQL Server"
+ ---------- Done 10 Matches Found On "MSOLEDBSQL SQL Server":
+ ---------- Finished Searching Target rrhh for 'MSOLEDBSQL SQL Server'    (19:49:13)
+
+
+
+
+
+4.- Grabar / Exportar archivos XLSX 
+Para poder exportar archivos de Excel en el nuevo formato, se debe modificar el código para tal efecto, el que 
+queda de la siguiente forma: 
+lds_nombre_datawindow.SaveAs(ls_nombrearchivo, XLSX!, TRUE)
+
+pb2019
+li_exito=GetFileSaveName("Guardar como", ls_path, ls_nombre, "XLS", "Excel (*.XLS),*.XLS,Archivos de Texto (*.TXT),*.TXT,Tabla HTML,*.HTM")
+pb2022
+li_exito = GetFileSaveName("Guardar como", ls_nombrearchivo, ls_nombre, "xlsx", "Excel (*.xlsx), *.xlsx, Texto Separado por Comas (*.csv), *.csv, Archivos de Texto (*.txt), *.txt")
+
+CHOOSE CASE upper(ls_extension)
+	CASE "LSX"
+	dw_bitacora.SaveAs(ls_nombrearchivo, xlsx!, true)
+
+
+ ---------- Search: Searching Target entregadocumentos for '.SaveAs'    (14:07:29)
+ ---------- 15 Matches Found On ".SaveAs":
+
+OK entregadocumentos.pbl(w_resumen_documentos).cb_exportar.clicked.0038:     dw_resumen_documentos.SaveAs(ls_path, Excel!,true)
+entregadocumentos.pbl(w_resumen_documentos).cb_exportar.clicked.0040:     dw_resumen_documentos.SaveAs(ls_path, Text!,true)
+entregadocumentos.pbl(w_resumen_documentos).cb_exportar.clicked.0042:     dw_resumen_documentos.SaveAs(ls_path, HTMLTable! ,true)
+pro_objetos.pbl(w_preview_informe)oe_saveas.0013:     dw_datos.SaveAs(ls_nombrearchivo, Excel!,true)
+pro_objetos.pbl(w_preview_informe)oe_saveas.0015:     dw_datos.SaveAs(ls_nombrearchivo, Text!,true)
+pro_objetos.pbl(w_preview_informe)oe_saveas.0017:     dw_datos.SaveAs(ls_nombrearchivo, HTMLTable! ,true)
+pro_objetos.pbl(w_preview_informe)oe_saveas.0082:       lds_datos.SaveAs(ls_nombrearchivo + "_" + string(ll_ind), Excel!,true)
+pro_objetos.pbl(w_preview_informe)oe_saveas.0084:       lds_datos.SaveAs(ls_nombrearchivo + "_" + string(ll_ind), Text!,true)
+pro_objetos.pbl(w_preview_informe)oe_saveas.0086:       lds_datos.SaveAs(ls_nombrearchivo + "_" + string(ll_ind), HTMLTable!,true)
+pro_objetos.pbl(w_preview_informe_response).pb_grabar.clicked.0013:     dw_datos.SaveAs(ls_nombrearchivo, Excel!,true)
+pro_objetos.pbl(w_preview_informe_response).pb_grabar.clicked.0015:     dw_datos.SaveAs(ls_nombrearchivo, Text!,true)
+pro_objetos.pbl(w_preview_informe_response).pb_grabar.clicked.0017:     dw_datos.SaveAs(ls_nombrearchivo, HTMLTable! ,true)
+pro_objetos.pbl(w_preview_informe_response).pb_grabar.clicked.0081:       lds_datos.SaveAs(ls_nombrearchivo + "_" + string(ll_ind), Excel!,true)
+pro_objetos.pbl(w_preview_informe_response).pb_grabar.clicked.0083:       lds_datos.SaveAs(ls_nombrearchivo + "_" + string(ll_ind), Text!,true)
+pro_objetos.pbl(w_preview_informe_response).pb_grabar.clicked.0085:       lds_datos.SaveAs(ls_nombrearchivo + "_" + string(ll_ind), HTMLTable!,true)
+
+
+
+5.- copiar Sybase.PowerBuilder.DataWindow.Excel12.dll
+6.- También, se debe quitar cualquier código anterior que copiaba las librerías y eliminar la ventana “w_precarga” si 
+es que existe. NO EXISTE
+7.- buscar y eliminar: RUN('XCOPY "\\150.10.10.4\Actualiza\Appeon\Runtime 22.2.0.3397\*.*" "C:\sistemas\Runtime 22.2.0.3397\*.*" /y /s', Minimized!). NO EXISTE
+
+8.- buscar y eliminar: FileExists("C:\sistemas\Runtime 22.2.0.3397\pbdwr220.pbd"). NO EXISTE 
