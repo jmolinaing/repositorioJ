@@ -1,8 +1,0 @@
-[Startup]
-AppName=FDU01 Device Driver
-ProductGUID=5ca48da0-c166-11d4-b2d8-009027d557d5
-[Languages]
-Default=0x0009
-count=2
-key0=0x0009
-key1=0x0012
