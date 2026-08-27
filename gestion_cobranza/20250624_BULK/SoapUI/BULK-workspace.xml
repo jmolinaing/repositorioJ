@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:soapui-workspace name="BULK" soapui-version="5.8.0" xmlns:con="http://eviware.com/soapui/config">
+  <con:settings/>
+  <con:project name="DS3 - SinClave">C:/Users/Jneo/Documents/DS3---SinClave-soapui-project.xml</con:project>
+  <con:project name="ISA_QA_DIRECTO">C:/Users/Jneo/Documents/ISA-PRODUCCION-soapui-project.xml</con:project>
+  <con:project name="ISA_QA_DIRECTO">C:/Users/Jneo/Documents/ISA-PRODUCCION-soapui-project.xml</con:project>
+  <con:project name="ISA_QA_DIRECTO">C:/Users/Jneo/Documents/ISA-QA-soapui-project.xml</con:project>
+  <con:project name="Reclamos Contra ISAPRE -DS3 - PRODUCCION">C:/Users/Jneo/Documents/Reclamos-Contra-ISAPRE--DS3---PRODUCCION-soapui-project.xml</con:project>
+  <con:project name="Reclamos Contra ISAPRE - DS3 - QA">C:/Users/Jneo/Documents/Reclamos-Contra-ISAPRE---DS3---QA-soapui-project.xml</con:project>
+  <con:project name="WS_COMPIN_PRODUCCION2 35">C:/Users/Jneo/Documents/WS-COMPIN-PRODUCCION2-35-soapui-project.xml</con:project>
+  <con:project name="WS_COMPIN_PRODUCCION 35">C:/Users/Jneo/Documents/WS-COMPIN-PRODUCCION-35-soapui-project.xml</con:project>
+  <con:project name="WS_COMPIN_PRODUCCION 35 old">C:/Users/Jneo/Documents/WS-COMPIN-PRODUCCION-soapui-project.xml</con:project>
+  <con:project name="WS_COMPIN_QA 110">C:/Users/Jneo/Documents/WS-COMPIN-QA-soapui-project.xml</con:project>
+</con:soapui-workspace>

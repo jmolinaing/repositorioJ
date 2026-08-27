@@ -1,0 +1,39 @@
+con una función de base de datos que se llama FG Scop Estado Resolve Hood, que ya está creada, ya existe.
+Si eso te devuelve con ese refolio el texto ingresado a tribunales, es porque está ingresada a tribunales.
+Así que ya la pega está hecha, ya ya podemos saber el estado de una resolución con esto.
+Y eso lo tenemos que meter dentro del SP SP1 de cobranza judicial.
+Entonces, si el estado es ingresada a tribunales,
+en ese caso le aplica el 15%.
+En otro caso, es decir, si esa resolución no existe, no está ingresada a tribunales, le aplica un 10%.
+Si no se envía un refolio, le aplica el 15%.
+Es decir, si viene nulo y queda nulo el refolio, también le sigue aplicando el 15%.
+Quizás tienes que volver a leerlo, pero eh en teoría está sencillo, está sencillo, hay que hacer algunas intervenciones, hay que modificar el SP, la lógica del SP.
+Eh yo revisé el sistema y solo en esta ventana, que es la lo que le llamamos el cuadrito de resumen de pago deuda, que es este, acá si te fijas tiene una línea que dice horario de cobranza.
+En esa parte tenemos que asegurarnos y ahí es donde hay que probar.
+Yo creo que las pruebas tienen que ser exhaustivas, eh buscar casos que busques una que esté ingresada a tribunales y y trates de de visualizar en el sistema, este cuadrito de resumen se abre desde la ventana gestión cobro.
+W gestión cobro, esto.
+Hay un botón que dice pagar deuda judicial.
+Desde ahí se abre esta esta ventana cuando eh existen deudas judicial porque si te fijas acá este es la ventana gestión de cobro, que esta ventana tiene un detalle de la deuda y acá abajo tiene unos botones.
+Y el botón pagar deuda judicial es el que llama la ventana al cuadro resumen.
+Pero en realidad no tenemos que intervenir el botón, solo tenemos que intervenir la ventana cuadro resumen.
+Él le llama al SP.
+Y esta ventana ya se abre solo cuando hay una resolución, por lo tanto ya setea, creo que en el Open lo hace.
+Ya setea el folio de la resolución, porque lo recibe como como parámetro.
+Ah, no, el mismo joven, creo que lo recibe en un back.
+Entonces lo que hace esto es abrir el back, acá está.
+Y lo setea una variable de instancia, que es el ID folio.
+Entonces esta ventana el refolio es el ID folio en esta ventana.
+Y eso hay que enviarlo en los parámetros y asegurarse de que si ingresó o si estoy pagando una resolución judicial eh que está ingresada a tribunales, el el monto me lo incremente este este monto a pagar sea eh el horario de cobranza un 15% más.
+Si no está ingresada a tribunales, tiene que ser solo un 10% más.
+¿Entendí?
+Y a futuro si esos porcentajes cambian, lo vamos a cambiar en el SP, no más, no no intervenimos esta lógica.
+Ese es el requerimiento uno y después tenemos un requerimiento dos.
+Que es este.
+Como le explica Alex.
+Alex dice,
+¿Cómo sacar certificado de deuda de empresas que tienen resolución judicial y también tienen periodos sin resolución judicial?
+En el botón imprimir, proponer el número de resolución judicial a imprimir o sin resolución judicial.
+Ya.
+Lo buscamos a nuestro lenguaje.
+Yo lo puse acá, mejorar la impresión del certificado de deuda.
+El certificado de deuda en el sistema de gestión de cobro se obtiene
