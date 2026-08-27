@@ -44,7 +44,7 @@ BEGIN
 	END
 	ELSE
 	BEGIN
-		-- Verificar estado de la resolución usando función mencionada en videos
+		-- Verificar estado de la resolución usando función
 		SET @estado_resolucion = dbo.f_ges_cob_estado_resoljud(@ref_folio)
 
 		PRINT @estado_resolucion

@@ -1,0 +1,20 @@
+-- ==========================================================  
+-- Author:  Alberto Rozas  
+-- Create date: 06-07-2022  
+-- Description: Consulta la deuda de una Resolución Judicial.  
+-- ==========================================================  
+-- exec spu_ges_cob_consdeuda_judicial 18325  
+CREATE PROCEDURE spu_ges_cob_consdeuda_judicial @rej_folio NUMERIC(10)   
+AS  
+BEGIN   
+ SET NOCOUNT ON;  
+  
+    SELECT SUM(RJD.RJD_DEUDA) AS DEUDANOMINAL,  
+   SUM(ROUND((CASE WHEN (INT.INT_REAJUSTE < 0) OR (INT.INT_REAJUSTE IS NULL) THEN 0 ELSE INT.INT_REAJUSTE END) / 100 * (COALESCE(RJD.RJD_DEUDA, 0)), 0)) AS REAJUSTE,  
+   SUM(ROUND((CASE WHEN (INT.INT_INTERES < 0) OR (INT.INT_INTERES IS NULL) THEN 0 ELSE INT.INT_INTERES END) / 100 * (COALESCE(RJD.RJD_DEUDA, 0)), 0)) AS INTERES,  
+   SUM(ROUND((CASE WHEN (INT.INT_RECARGO < 0) OR (INT.INT_RECARGO IS NULL) THEN 0 ELSE INT.INT_RECARGO END) / 100 * (COALESCE(RJD.RJD_DEUDA, 0)), 0)) AS RECARGO  
+ FROM RESOLUCION_JUDICIAL REJ WITH (NOLOCK)  
+   JOIN RJUD_DEUDA RJD WITH (NOLOCK) ON RJD.REJ_FOLIO = REJ.REJ_FOLIO    
+   LEFT JOIN INTERESES INT WITH (NOLOCK) ON INT.INT_PPC_PERIODO = RJD.RJD_PERIODO AND INT.INT_FECHA_PAGO = CONVERT(CHAR(8), GETDATE(), 112)  
+ WHERE REJ.REJ_FOLIO = @rej_folio  
+END  
